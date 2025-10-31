@@ -17,9 +17,22 @@ rtabmap:
     scan_cloud: true  # Use point cloud instead of 2D laser scan
 
     # IMU configuration
-    subscribe_imu: true
+    subscribe_imu: false
     imu_topic: "/livox/imu"
     ImuFilter: "1"  # "0"=No filter, "1"=Madgwick, "2"=Complementary
+
+    # Use ICP odometry - ВСЕ значения как строки
+    Reg/Strategy: "1"  # "0"=Visual, "1"=ICP, "2"=Visual+ICP
+    Reg/Force3DoF: "true"
+    Icp/Strategy: "1"  # "0"=PointToPlane, "1"=PointToPoint
+    Icp/VoxelSize: "0.02"
+    Icp/Iterations: "100"
+    Icp/CorrespondenceRatio: "0.05"
+    Icp/MaxCorrespondenceDistance: "0.5"
+    Icp/OutlierRatio: "0.85"
+    Icp/CorrespondenceReduction: "true"
+    Icp/PM: "true"  # Probability Mapping
+    Icp/PMOutlierRatio: "0.7"
 
     # RGBD settings
     RGBD/ProximityPathMaxNeighbors: "0"
@@ -43,6 +56,11 @@ rtabmap:
     Grid/Global: "true"
     Grid/RayTracing: "true"
     Grid/Updated: "true"
+
+    # Параметры фильтрации облака точек 
+    scan_cloud_max_points: 0 # 0=без ограничения, >0=макс. количество точек 
+    scan_cloud_min_range: 0.4 # Минимальная дальность 
+    scan_cloud_max_range: 10.0 # Максимальная дальность
 
     # Memory management - ВСЕ как строки
     Mem/ImagePreDecimation: "1"

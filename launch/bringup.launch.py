@@ -10,22 +10,7 @@ BAG_MODE = 'bag'
 ROBOT_MODE = 'robot'
 
 
-def _resolve_launch_root() -> Path:
-    this_dir = Path(__file__).resolve().parent
-    project_root = this_dir.parent
-    candidates = [
-        project_root / 'workspace' / 'src' / 'launch',
-        project_root / 'src' / 'launch',
-    ]
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-
-    raise FileNotFoundError('Unable to locate shared bringup launch directory')
-
-
-LAUNCH_ROOT = _resolve_launch_root()
+LAUNCH_ROOT = Path(__file__).resolve().parent
 
 
 def _include_selected_launch(context):

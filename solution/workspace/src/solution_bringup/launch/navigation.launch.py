@@ -8,7 +8,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    bringup_share = get_package_share_directory('kobuki_bringup')
+    bringup_share = get_package_share_directory('solution_bringup')
 
     default_rtabmap_params = os.path.join(bringup_share, 'config', 'rtabmap_params.yaml')
     default_nav2_params = os.path.join(bringup_share, 'config', 'nav2_params.yaml')
@@ -43,9 +43,22 @@ def generate_launch_description():
                 ('scan', '/scan'),
                 ('scan_cloud', '/livox/lidar'),
                 ('map', '/rtabmap_map'),
+                ('imu', '/livox/imu'),
                 ('odom_info', '/rtabmap/odom_info'),
+                ('odom', '/icp_odom'),
             ],
             arguments=['--delete_db_on_start'],
+        ),
+        Node(
+            package='rtabmap_odom',
+            executable='icp_odometry',
+            name='icp_odometry',
+            output='screen',
+            parameters=[rtabmap_params_file],
+            remappings=[
+                ('scan', '/scan'),
+                ('odom', '/icp_odom'),
+            ]
         ),
         # Node(
         #     package='nav2_controller',

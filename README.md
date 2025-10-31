@@ -65,22 +65,24 @@ NUC, в eth3 Livox MID-360.
 1. Для подготовки решения предлагается собрать использовать свой docker-образ
 на базе организационного. Для этого доступны следующие команды:
 
-        bash kobuki/docker/build.bash  - сборка образа
-        bash kobuki/docker/run.bash    - запуск контейнера
-        bash kobuki/docker/into.bash   - запуск bash в контейнере
-        bash kobuki/docker/stop.bash   - остановка контейнера
+        bash docker/build.bash  - сборка образа
+        bash docker/run.bash    - запуск контейнера (режим robot)
+        bash docker/run_bag.bash - запуск контейнера (режим bag)
+        bash docker/into.bash   - запуск bash в контейнере
+        bash docker/stop.bash   - остановка контейнера
 
 
-2. Рабочее окружение colcon расположено в ```kobuki/workspace``` и монтируется
-внутрь контейнера в корень файловой системы, таким образом разработку можно
-вести как внутри, так и вне контейнера.
+2. Аппаратный стек находится в `kobuki/workspace` и собирается внутри docker-образа
+один раз. Своё решение размещайте в `solution/workspace`, этот overlay монтируется
+в контейнер как `/workspace`, поэтому разработку можно вести как внутри, так и вне контейнера.
 
-    *Если вы получили робота во время участия в хакатоне, то рабочее окружение уже должно быть собрано и можно перейти к следующему разделу.*
+    *Если вы получили робота во время участия в хакатоне, то оба workspace уже собраны и можно перейти к следующему разделу.*
 
-    Для сборки пакетов откройте новую bash-сессию в контейнере, перейдите в
-    директорию окружения и выполните соответствующую команду:
+    Для пересборки своих пакетов откройте новую bash-сессию в контейнере, подключите
+    базовый стек и запустите colcon:
 
-        bash kobuki/docker/into.bash
+        bash docker/into.bash
+        source /kobuki_ws/install/setup.bash
         cd /workspace
         colcon build --symlink-install --cmake-args  -DCMAKE_BUILD_TYPE=Release
 
@@ -97,7 +99,7 @@ NUC, в eth3 Livox MID-360.
 
     Запустите драйвер kobuki, затем откройте новый терминал, войдите в контейнер и запустите teleop:
 
-        bash kobuki/docker/into.bash
+        bash docker/into.bash
         ros2 run teleop_twist_keyboard teleop_twist_keyboard /cmd_vel:=/commands/velocity
 
      В случае, если вы можете управлять роботом, то подготовку к работе с Turtlebot 2 можно считать оконченой.

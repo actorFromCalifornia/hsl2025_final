@@ -9,14 +9,14 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    bringup_share = get_package_share_directory('kobuki_bringup')
+    bringup_share = get_package_share_directory('solution_bringup')
 
     default_rtabmap_params = os.path.join(bringup_share, 'config', 'rtabmap_params.yaml')
     default_nav2_params = os.path.join(bringup_share, 'config', 'nav2_params.yaml')
 
     navigation_launch = PythonLaunchDescriptionSource(
         PathJoinSubstitution([
-            FindPackageShare('kobuki_bringup'),
+            FindPackageShare('solution_bringup'),
             'launch',
             'navigation.launch.py',
         ])
