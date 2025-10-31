@@ -6,7 +6,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
-
+from launch_ros.actions import Node
 
 def generate_launch_description():
     bringup_share = get_package_share_directory('solution_bringup')
@@ -49,5 +49,13 @@ def generate_launch_description():
                 'rtabmap_params_file': rtabmap_params_file,
                 'nav2_params_file': nav2_params_file,
             }.items(),
+        ),
+        Node(
+            package='mark_detector',
+            executable='mark_detector_node',
+            name='mark_detector_node',
+            output='screen',
+            parameters=[{
+            }],
         ),
     ])
