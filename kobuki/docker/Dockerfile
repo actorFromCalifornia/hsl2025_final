@@ -24,6 +24,7 @@ ENV WS=/workspace
 WORKDIR ${WS}
 
 COPY workspace/ ${WS}/
+COPY docker/ ${WS}/docker/
 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && colcon build --symlink-install
 

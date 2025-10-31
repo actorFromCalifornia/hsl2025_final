@@ -17,6 +17,7 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    profiles: ["bag"]
     command: /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && source /workspace/install/setup.bash && ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_10_31-13_25_37}\" --clock --rate 1.0"
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
@@ -36,11 +37,9 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
     network_mode: "host"
-    depends_on:
-      - bag_player
     volumes:
       - ../../docker_ws:/workspace/docker_ws
     command: >
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
                      source /workspace/install/setup.bash && \
-                     ros2 launch kobuki_bringup bringup.launch.py"
+                     ros2 launch /workspace/docker/bringup.launch.py mode:=${BRINGUP_MODE:-bag}"
