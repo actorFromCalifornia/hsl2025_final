@@ -1,12 +1,31 @@
+from pathlib import Path
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch_ros.substitutions import FindPackageShare
+from launch.substitutions import LaunchConfiguration
 
 
 BAG_MODE = 'bag'
 ROBOT_MODE = 'robot'
+
+
+def _resolve_launch_root() -> Path:
+    this_dir = Path(__file__).resolve().parent
+    project_root = this_dir.parent
+    candidates = [
+        project_root / 'workspace' / 'src' / 'launch',
+        project_root / 'src' / 'launch',
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    raise FileNotFoundError('Unable to locate shared bringup launch directory')
+
+
+LAUNCH_ROOT = _resolve_launch_root()
 
 
 def _include_selected_launch(context):
@@ -21,13 +40,7 @@ def _include_selected_launch(context):
 
     return [
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([
-                    FindPackageShare('kobuki_bringup'),
-                    'launch',
-                    launch_filename,
-                ])
-            ),
+            PythonLaunchDescriptionSource(str(LAUNCH_ROOT / launch_filename)),
             launch_arguments=launch_arguments.items(),
         )
     ]
