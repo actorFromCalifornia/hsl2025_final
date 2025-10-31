@@ -1,5 +1,8 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Written by Nikolay Dema <ndema2301@gmail.com>, May 2025
+set -euo pipefail
 
-docker exec -it "kobuki" /bin/bash
+CONTAINER_NAME="hsl2025-kobuki"
+
+echo "[kobuki/docker] Attaching to ${CONTAINER_NAME}"
+docker exec -it "${CONTAINER_NAME}" /bin/bash

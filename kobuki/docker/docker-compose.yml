@@ -1,0 +1,44 @@
+services:
+  foxglove-bridge:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: hsl2025-foxglove
+    command: /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && source /workspace/install/setup.bash && ros2 run foxglove_bridge foxglove_bridge --port 8765 --address 0.0.0.0"
+    ports:
+      - "8765:8765"
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+
+  bag_player:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && source /workspace/install/setup.bash && ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_10_31-13_25_37}\" --clock --rate 1.0 --topics /tf /tf_static /livox/lidar /livox/imu /odom"
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+    volumes:
+      - ../../bags:/workspace/bags:ro
+    depends_on:
+      - foxglove-bridge
+
+  kobuki-bringup:
+    platform: linux/amd64
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: hsl2025-kobuki
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    network_mode: "host"
+    volumes:
+      - ../../docker_ws:/workspace/docker_ws
+    command: >
+      /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
+                     source /workspace/install/setup.bash && \
+                     ros2 launch kobuki_bringup bringup.launch.py"

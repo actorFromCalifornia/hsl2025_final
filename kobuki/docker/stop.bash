@@ -1,5 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Written by Nikolay Dema <ndema2301@gmail.com>, Jun 2025
+set -euo pipefail
 
-docker stop -t 2 "kobuki" > /dev/null
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+echo "[kobuki/docker] Stopping bringup stack"
+
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" down
