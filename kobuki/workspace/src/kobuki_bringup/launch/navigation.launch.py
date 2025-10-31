@@ -44,8 +44,6 @@ def generate_launch_description():
                 ('scan_cloud', '/livox/lidar'),
                 ('map', '/rtabmap_map'),
                 ('odom_info', '/rtabmap/odom_info'),
-                # Публикуем одометрию в отдельный топик, чтобы не конфликтовать с bag /odom
-                ('/odom', '/rtabmap/odom'),
             ],
             arguments=['--delete_db_on_start'],
         ),
