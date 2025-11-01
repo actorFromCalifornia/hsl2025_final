@@ -2,24 +2,28 @@
 <robot name="robot">
     <webots>
         <plugin type="webots_bridge.webots_driver.WebotsDriver" />
-        <device reference="lidar" type="Lidar">
+        <device reference="LDS-01" type="Lidar">
             <ros>
-                <enabled>True</enabled>
-                <topicName>/scan_raw</topicName>
+                <enabled>true</enabled>
                 <updateRate>10</updateRate>
-                <alwaysOn>True</alwaysOn>
-                <frameName>lidar</frameName>
+                <topicName>/scan</topicName>
+                <alwaysOn>false</alwaysOn>
+                <frameName>LDS-01</frameName>
             </ros>
-        </device>        
-        <plugin type="webots_ros2_driver::Ros2IMU">
-            <enabled>True</enabled>
-            <topicName>/imu</topicName>
-            <updateRate>10</updateRate>
-            <alwaysOn>True</alwaysOn>
-            <frameName>base_link</frameName>
-            <inertialUnitName>imu</inertialUnitName>
-            <gyroName>gyro</gyroName>
-            <accelerometerName>acc</accelerometerName>
-        </plugin>
+        </device>
     </webots>
+
+    <ros2_control name="WebotsControl" type="system">
+        <hardware>
+            <plugin>webots_ros2_control::Ros2ControlSystem</plugin>
+        </hardware>
+        <joint name="right wheel motor">
+            <state_interface name="position"/>
+            <command_interface name="velocity"/>
+        </joint>
+        <joint name="left wheel motor">
+            <state_interface name="position"/>
+            <command_interface name="velocity"/>
+        </joint>
+    </ros2_control>    
 </robot>
