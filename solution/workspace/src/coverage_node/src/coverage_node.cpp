@@ -2,6 +2,11 @@
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include <tf2/LinearMath/Quaternion.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 namespace coverage_node
 {
@@ -9,12 +14,26 @@ namespace coverage_node
 CoverageNode::CoverageNode()
 : Node("coverage_node"),
   cell_size_(1.0),
+  grid_width_cells_(8),
+  grid_height_cells_(4),
   last_update_time_(this->now()),
   min_update_interval_(1.0),
   cell_selection_interval_(2.0),
   last_selection_time_(this->now()),
-  is_publishing_(false)
+  is_publishing_(false),
+  grid_origin_set_(false),
+  grid_origin_x_(0.0),
+  grid_origin_y_(0.0)
 {
+  // Declare parameters
+  this->declare_parameter("grid_width_cells", 8);
+  this->declare_parameter("grid_height_cells", 4);
+  this->declare_parameter("cell_size", 1.0);
+  
+  // Get parameters
+  grid_width_cells_ = this->get_parameter("grid_width_cells").as_int();
+  grid_height_cells_ = this->get_parameter("grid_height_cells").as_int();
+  cell_size_ = this->get_parameter("cell_size").as_double();
   map_sub_ = this->create_subscription<nav_msgs::msg::OccupancyGrid>(
     "/rtabmap_map", 1,
     std::bind(&CoverageNode::map_callback, this, std::placeholders::_1));
@@ -34,9 +53,61 @@ CoverageNode::CoverageNode()
 CellCoord CoverageNode::world_to_cell(double x, double y, double origin_x, double origin_y) const
 {
   CellCoord cell;
-  cell.x = static_cast<int>(std::floor((x - origin_x) / cell_size_));
-  cell.y = static_cast<int>(std::floor((y - origin_y) / cell_size_));
+  
+  if (!grid_origin_set_) {
+    // Fallback to provided origin if grid origin not set yet
+    double local_x = y - origin_y;
+    double local_y = -(x - origin_x);
+    cell.x = static_cast<int>(std::floor(local_x / cell_size_));
+    cell.y = static_cast<int>(std::floor(local_y / cell_size_));
+    return cell;
+  }
+  
+  // Rotate world coordinates back by -90 degrees to get grid-local coordinates
+  // Rotation: (x, y) -> (y, -x) for -90 degrees
+  double local_x = y - grid_origin_y_;
+  double local_y = -(x - grid_origin_x_);
+  
+  cell.x = static_cast<int>(std::floor(local_x / cell_size_));
+  cell.y = static_cast<int>(std::floor(local_y / cell_size_));
   return cell;
+}
+
+void CoverageNode::find_explored_region_corner(const nav_msgs::msg::OccupancyGrid::SharedPtr msg, double& corner_x, double& corner_y)
+{
+  double resolution = msg->info.resolution;
+  int width = msg->info.width;
+  int height = msg->info.height;
+  
+  // Find the explored region bounds (min and max)
+  int min_x = width;
+  int min_y = height;
+  bool has_explored = false;
+  
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      int index = y * width + x;
+      int8_t cell_value = msg->data[index];
+      
+      // Check if cell is explored (not unknown, which is -1)
+      if (cell_value != -1) {
+        has_explored = true;
+        if (x < min_x) min_x = x;
+        if (y < min_y) min_y = y;
+      }
+    }
+  }
+  
+  // Convert to world coordinates - this is the bottom-left corner of explored region
+  if (has_explored && min_x < width && min_y < height) {
+    // Convert grid coordinates to world coordinates
+    corner_x = msg->info.origin.position.x + min_x * resolution;
+    corner_y = msg->info.origin.position.y + min_y * resolution;
+  } else {
+    // Fallback to map origin position
+    corner_x = msg->info.origin.position.x;
+    corner_y = msg->info.origin.position.y;
+  }
 }
 
 void CoverageNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
@@ -76,20 +147,35 @@ geometry_msgs::msg::PoseStamped CoverageNode::cell_to_pose(const CellCoord& cell
     return pose;
   }
   
-  double origin_x = last_map_->info.origin.position.x;
-  double origin_y = last_map_->info.origin.position.y;
+  if (!grid_origin_set_) {
+    geometry_msgs::msg::PoseStamped pose;
+    return pose;
+  }
   
   geometry_msgs::msg::PoseStamped pose;
   pose.header.frame_id = "map";
   pose.header.stamp = this->now();
   
-  // Center of the cell
-  pose.pose.position.x = origin_x + (cell.x + 0.5) * cell_size_;
-  pose.pose.position.y = origin_y + (cell.y + 0.5) * cell_size_;
+  // Grid-local coordinates
+  double local_x = (cell.x + 0.5) * cell_size_;
+  double local_y = (cell.y + 0.5) * cell_size_;
+  
+  // Rotate by 90 degrees counter-clockwise: (x, y) -> (-y, x)
+  double rot_x = -local_y;
+  double rot_y = local_x;
+  
+  // Center of the cell in world coordinates (using grid origin)
+  pose.pose.position.x = grid_origin_x_ + rot_x;
+  pose.pose.position.y = grid_origin_y_ + rot_y;
   pose.pose.position.z = 0.0;
   
-  // Orientation - facing forward (no rotation)
-  pose.pose.orientation.w = 1.0;
+  // Orientation - 90 degrees rotation
+  tf2::Quaternion rot_90;
+  rot_90.setRPY(0, 0, M_PI / 2.0);
+  pose.pose.orientation.x = rot_90.x();
+  pose.pose.orientation.y = rot_90.y();
+  pose.pose.orientation.z = rot_90.z();
+  pose.pose.orientation.w = rot_90.w();
   
   return pose;
 }
@@ -154,18 +240,13 @@ void CoverageNode::nav2_result_callback(
 
 void CoverageNode::select_next_cell()
 {
-  if (!last_map_ || !current_robot_cell_.has_value()) {
+  if (!last_map_ || !current_robot_cell_.has_value() || !grid_origin_set_) {
     return;
   }
 
-  double resolution = last_map_->info.resolution;
-  double origin_x = last_map_->info.origin.position.x;
-  double origin_y = last_map_->info.origin.position.y;
-  double map_width_m = last_map_->info.width * resolution;
-  double map_height_m = last_map_->info.height * resolution;
-  
-  int cells_x = static_cast<int>(std::floor(map_width_m / cell_size_));
-  int cells_y = static_cast<int>(std::floor(map_height_m / cell_size_));
+  // Use fixed grid size: 8x4 cells
+  int cells_x = grid_width_cells_;
+  int cells_y = grid_height_cells_;
 
   CellCoord robot_cell = current_robot_cell_.value();
   double min_distance = std::numeric_limits<double>::max();
@@ -220,12 +301,25 @@ void CoverageNode::map_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr ms
 
   last_update_time_ = current_time;
   last_map_ = msg;
+  
+  // Set grid origin to map origin only once on first map reception
+  if (!grid_origin_set_) {
+    // Use map origin directly, shift by 5 cells on X axis
+    grid_origin_x_ = msg->info.origin.position.x + 5.3 * cell_size_;
+    grid_origin_y_ = msg->info.origin.position.y;
+    grid_origin_set_ = true;
+  }
+  
   publish_grid_visualization(msg);
   is_publishing_ = false;
 }
 
 void CoverageNode::publish_grid_visualization(const nav_msgs::msg::OccupancyGrid::SharedPtr msg)
 {
+  if (!grid_origin_set_) {
+    return;
+  }
+  
   rclcpp::Time now = this->now();
   
   // First, delete all previous markers
@@ -240,16 +334,10 @@ void CoverageNode::publish_grid_visualization(const nav_msgs::msg::OccupancyGrid
   // Small delay to ensure DELETEALL is processed
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-  // Now create new grid
-  double resolution = msg->info.resolution;
-  double origin_x = msg->info.origin.position.x;
-  double origin_y = msg->info.origin.position.y;
-  double map_width_m = msg->info.width * resolution;
-  double map_height_m = msg->info.height * resolution;
+  // Use fixed grid size: 8x4 cells
+  int cells_x = grid_width_cells_;
+  int cells_y = grid_height_cells_;
   
-  int cells_x = static_cast<int>(std::floor(map_width_m / cell_size_));
-  int cells_y = static_cast<int>(std::floor(map_height_m / cell_size_));
-
   auto grid_msg = std::make_shared<visualization_msgs::msg::MarkerArray>();
   grid_msg->markers.reserve(cells_y + 1 + cells_x + 1 + cells_x * cells_y);  // Lines + cells
 
@@ -270,10 +358,26 @@ void CoverageNode::publish_grid_visualization(const nav_msgs::msg::OccupancyGrid
       cell_marker.type = visualization_msgs::msg::Marker::CUBE;
       cell_marker.action = visualization_msgs::msg::Marker::ADD;
       
-      cell_marker.pose.position.x = origin_x + (x + 0.5) * cell_size_;
-      cell_marker.pose.position.y = origin_y + (y + 0.5) * cell_size_;
+      // Grid-local coordinates
+      double local_x = (x + 0.5) * cell_size_;
+      double local_y = (y + 0.5) * cell_size_;
+      
+      // Rotate by 90 degrees counter-clockwise: (x, y) -> (-y, x)
+      double rot_x = -local_y;
+      double rot_y = local_x;
+      
+      // Use grid origin (explored region corner)
+      cell_marker.pose.position.x = grid_origin_x_ + rot_x;
+      cell_marker.pose.position.y = grid_origin_y_ + rot_y;
       cell_marker.pose.position.z = 0.01;
-      cell_marker.pose.orientation.w = 1.0;
+      
+      // Orientation - 90 degrees rotation
+      tf2::Quaternion rot_90;
+      rot_90.setRPY(0, 0, M_PI / 2.0);
+      cell_marker.pose.orientation.x = rot_90.x();
+      cell_marker.pose.orientation.y = rot_90.y();
+      cell_marker.pose.orientation.z = rot_90.z();
+      cell_marker.pose.orientation.w = rot_90.w();
       
       cell_marker.scale.x = cell_size_ * 0.9;
       cell_marker.scale.y = cell_size_ * 0.9;
@@ -320,11 +424,19 @@ void CoverageNode::publish_grid_visualization(const nav_msgs::msg::OccupancyGrid
     marker.color.a = 0.5;
     
     geometry_msgs::msg::Point p1, p2;
-    p1.x = origin_x;
-    p1.y = origin_y + i * cell_size_;
+    
+    // Grid-local coordinates for horizontal line
+    double local_x1 = 0.0;
+    double local_y1 = i * cell_size_;
+    double local_x2 = cells_x * cell_size_;
+    double local_y2 = i * cell_size_;
+    
+    // Rotate by 90 degrees counter-clockwise: (x, y) -> (-y, x)
+    p1.x = grid_origin_x_ + (-local_y1);
+    p1.y = grid_origin_y_ + local_x1;
     p1.z = 0.0;
-    p2.x = origin_x + map_width_m;
-    p2.y = origin_y + i * cell_size_;
+    p2.x = grid_origin_x_ + (-local_y2);
+    p2.y = grid_origin_y_ + local_x2;
     p2.z = 0.0;
     marker.points.push_back(p1);
     marker.points.push_back(p2);
@@ -348,11 +460,19 @@ void CoverageNode::publish_grid_visualization(const nav_msgs::msg::OccupancyGrid
     marker.color.a = 0.5;
     
     geometry_msgs::msg::Point p1, p2;
-    p1.x = origin_x + i * cell_size_;
-    p1.y = origin_y;
+    
+    // Grid-local coordinates for vertical line
+    double local_x1 = i * cell_size_;
+    double local_y1 = 0.0;
+    double local_x2 = i * cell_size_;
+    double local_y2 = cells_y * cell_size_;
+    
+    // Rotate by 90 degrees counter-clockwise: (x, y) -> (-y, x)
+    p1.x = grid_origin_x_ + (-local_y1);
+    p1.y = grid_origin_y_ + local_x1;
     p1.z = 0.0;
-    p2.x = origin_x + i * cell_size_;
-    p2.y = origin_y + map_height_m;
+    p2.x = grid_origin_x_ + (-local_y2);
+    p2.y = grid_origin_y_ + local_x2;
     p2.z = 0.0;
     marker.points.push_back(p1);
     marker.points.push_back(p2);

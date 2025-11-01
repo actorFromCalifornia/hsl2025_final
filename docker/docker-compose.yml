@@ -27,7 +27,7 @@ services:
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
                      source /kobuki_ws/install/setup.bash && \
                      source /workspace/install/setup.bash && \
-                     ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_10_31-13_25_37}\" --clock --rate 1.0 --topics /tf_static /livox/lidar /livox/imu"
+                     ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_11_01-13_31_56}\" --clock --rate 1.0 --topics /tf_static /livox/lidar /livox/imu"
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
       - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}

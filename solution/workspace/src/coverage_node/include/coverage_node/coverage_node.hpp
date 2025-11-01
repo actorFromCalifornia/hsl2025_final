@@ -16,6 +16,7 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <tf2/LinearMath/Quaternion.h>
 
 namespace coverage_node
 {
@@ -52,6 +53,7 @@ private:
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
   void publish_grid_visualization(const nav_msgs::msg::OccupancyGrid::SharedPtr msg);
   void select_next_cell();
+  void find_explored_region_corner(const nav_msgs::msg::OccupancyGrid::SharedPtr msg, double& corner_x, double& corner_y);
   void send_nav2_goal(const CellCoord& cell);
   void nav2_goal_response_callback(
     const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr & goal_handle);
@@ -75,12 +77,19 @@ private:
 
   // Grid parameters
   double cell_size_;
+  int grid_width_cells_;
+  int grid_height_cells_;
 
   // Coverage tracking
   std::unordered_set<CellCoord, CellHash> visited_cells_;
   std::optional<CellCoord> selected_cell_;
   std::optional<CellCoord> current_robot_cell_;
   nav_msgs::msg::OccupancyGrid::SharedPtr last_map_;
+  
+  // Grid origin - aligned to explored region corner (set once on first map)
+  bool grid_origin_set_;
+  double grid_origin_x_;
+  double grid_origin_y_;
   
   // Coverage algorithm parameters
   double cell_selection_interval_;
