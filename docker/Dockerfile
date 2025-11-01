@@ -18,8 +18,23 @@ RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-pointcloud-to-laserscan \
     ros-${ROS_DISTRO}-rosbag2 \
     ros-${ROS_DISTRO}-foxglove-bridge \
+    ros-${ROS_DISTRO}-pcl-ros \
+    ros-${ROS_DISTRO}-pcl-conversions \
+    ros-${ROS_DISTRO}-pcl-msgs \
     python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
+
+RUN apt update && apt install -y cmake g++ wget unzip
+RUN mkdir -p ~/opencv && cd ~/opencv && \
+    wget -O opencv.zip https://github.com/opencv/opencv/archive/4.12.0.zip && \
+    unzip opencv.zip && \
+    mkdir -p build && cd build && \
+    cmake ../opencv-4.12.0 && cmake --build . && \
+    sudo make install
+
+RUN apt-get update && apt-get install -y \
+    ros-${ROS_DISTRO}-tf2-ros \
+    ros-${ROS_DISTRO}-tf2-geometry-msgs
 
 ENV KOBUKI_WS=/kobuki_ws
 ENV SOLUTION_WS=/workspace
