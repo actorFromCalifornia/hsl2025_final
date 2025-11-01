@@ -101,18 +101,18 @@ planner_server:
     expected_planner_frequency: 2.0
     planner_plugins: ["GridBased"]
     GridBased:
-      plugin: "nav2_theta_star_planner/ThetaStarPlanner"
-      tolerance: 0.5
-      max_iterations: 10000
-      max_planning_time: 5.0
-      use_astar: true
+      plugin: "nav2_smac_planner/SmacPlanner2D"
+      tolerance: 0.25
+      max_iterations: 100
+      max_on_approach_iterations: 1000
       allow_unknown: true
-      how_many_corners: 8
-      w_traversal_cost: 16.0    # вес стоимости проходимости
-      w_euc_cost: 0.001          # вес евклидова расстояния
-      w_heuristic: 0.001         # вес эвристики
-      planner_window_x: 6.0
-      planner_window_y: 6.0
+      downsample_costmap: false
+      smooth_path: true
+      motion_model_for_search: "MOORE"
+      angle_quantization_bins: 16
+      minimum_turning_radius: 0.0
+      cache_obstacle_heuristic: false
+      use_astar: true
 
 behavior_server:
   ros__parameters:

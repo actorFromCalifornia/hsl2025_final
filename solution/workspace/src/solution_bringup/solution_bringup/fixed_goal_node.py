@@ -2,6 +2,7 @@ import math
 import random
 
 import rclpy
+import time
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import NavigateToPose
 from rclpy.action import ActionClient
@@ -34,17 +35,23 @@ class FixedGoalSetter(Node):
             f'Задана цель: x={self.goal_x}, y={self.goal_y}, yaw={self.goal_yaw}'
         )
 
-        # Action client for Nav2 navigation
         self._action_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
-
         self.attempt_count = 0
         self.current_goal_x = self.goal_x
         self.current_goal_y = self.goal_y
         self.current_goal_yaw = self.goal_yaw
-        self.retry_timer = None
 
-        # Delay the first goal to give Nav2 time to come up
-        self.initial_timer = self.create_timer(10.0, self.initial_goal_callback)
+        while True:
+            self.send_goal(self.current_goal_x, self.current_goal_y, self.current_goal_yaw)
+            time.sleep(2)
+
+        # Action client for Nav2 navigation
+        
+
+        # self.retry_timer = None
+
+        # # Delay the first goal to give Nav2 time to come up
+        # self.initial_timer = self.create_timer(10.0, self.initial_goal_callback)
 
     def _declare_if_needed(self, name: str, default_value) -> None:
         """Declare a parameter only if it was not provided via overrides."""
