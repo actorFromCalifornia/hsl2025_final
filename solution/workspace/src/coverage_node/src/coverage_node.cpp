@@ -305,8 +305,8 @@ void CoverageNode::map_callback(const nav_msgs::msg::OccupancyGrid::SharedPtr ms
   // Set grid origin to map origin only once on first map reception
   if (!grid_origin_set_) {
     // Use map origin directly, shift by 5 cells on X axis
-    grid_origin_x_ = msg->info.origin.position.x + 5.3 * cell_size_;
-    grid_origin_y_ = msg->info.origin.position.y;
+    grid_origin_x_ = msg->info.origin.position.x + 5.25 * cell_size_;
+    grid_origin_y_ = msg->info.origin.position.y - 0.1 * cell_size_;
     grid_origin_set_ = true;
   }
   
