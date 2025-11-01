@@ -14,6 +14,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(tf2 REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
@@ -31,6 +32,7 @@ add_executable(coverage_node
 ament_target_dependencies(coverage_node
   rclcpp
   rclcpp_action
+  tf2
   nav_msgs
   nav2_msgs
   visualization_msgs

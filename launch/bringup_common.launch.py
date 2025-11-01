@@ -67,4 +67,7 @@ def generate_launch_description():
                 'use_sim_time': use_sim_time,
             }],
         ),
+        IncludeLaunchDescription(
+            coverage_launch,
+        ),
     ])
