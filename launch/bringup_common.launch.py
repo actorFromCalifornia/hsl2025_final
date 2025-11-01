@@ -67,7 +67,7 @@ def generate_launch_description():
                 {
                     'use_sim_time': True,
                     'goal_x': 0.0,
-                    'goal_y': 2.5,
+                    'goal_y': 3.5,
                     'goal_yaw': 0.0,
                     'max_attempts': 100,
                     'retry_radius': 0.1,
