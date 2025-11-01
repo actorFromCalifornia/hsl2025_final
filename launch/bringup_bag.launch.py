@@ -12,6 +12,7 @@ def generate_launch_description():
                     ThisLaunchFileDir(),
                     'bringup_common.launch.py',
                 ])
-            )
+            ),
+            launch_arguments={'use_sim_time': 'true'}.items(),
         ),
     ])

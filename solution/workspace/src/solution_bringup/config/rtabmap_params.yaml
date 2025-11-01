@@ -29,7 +29,7 @@ rtabmap:
     Grid/FromDepth: "false"
     Grid/3D: "false"
     Grid/CellSize: "0.02"  # 2cm resolution
-    Grid/Size: "15"  # 15m grid size (for 3x3m + margin)
+    Grid/Size: "16"  # 15m grid size (for 3x3m + margin)
     Grid/RangeMax: "8.0"  # Max lidar range
     Grid/Sensor: "0"
     Grid/MinClusterSize: "3"
@@ -78,7 +78,7 @@ icp_odometry:
     frame_id: "base_link"
     odom_frame_id: "icp_odom"
     map_frame_id: "map"
-    
+
     # RGBG configuration
     subscribe_rgb: false
     subscribe_depth: false

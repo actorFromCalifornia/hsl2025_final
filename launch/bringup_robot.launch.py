@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, ThisLaunchFileDir
+from launch.substitutions import PathJoinSubstitution, ThisLaunchFileDir
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -14,8 +14,6 @@ def generate_launch_description():
         ])
     )
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
     return LaunchDescription([
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -23,10 +21,11 @@ def generate_launch_description():
                     ThisLaunchFileDir(),
                     'bringup_common.launch.py',
                 ])
-            )
+            ),
+            launch_arguments={'use_sim_time': 'false'}.items(),
         ),
         IncludeLaunchDescription(
             sensors_launch,
-            launch_arguments={'use_sim_time': use_sim_time}.items(),
+            launch_arguments={'use_sim_time': 'false'}.items(),
         ),
     ])

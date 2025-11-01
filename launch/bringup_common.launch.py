@@ -56,6 +56,7 @@ def generate_launch_description():
             name='mark_detector_node',
             output='screen',
             parameters=[{
+                'use_sim_time': use_sim_time,
             }],
         ),
     ])
