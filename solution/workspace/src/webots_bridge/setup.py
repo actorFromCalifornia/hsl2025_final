@@ -4,7 +4,7 @@ package_name = 'webots_bridge'
 data_files = []
 data_files.append(('share/ament_index/resource_index/packages', ['resource/' + package_name]))
 data_files.append(('share/' + package_name + '/launch', ['launch/robot_launch.py']))
-data_files.append(('share/' + package_name + '/worlds', ['worlds/cobra_flex_demo.wbt']))
+data_files.append(('share/' + package_name + '/worlds', ['worlds/hsl_maze.wbt']))
 data_files.append(('share/' + package_name + '/resource', ['resource/webots_bridge.urdf']))
 data_files.append(('share/' + package_name + '/objects/backgrounds/protos', [
     'objects/backgrounds/protos/TexturedBackground.proto',
