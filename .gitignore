@@ -3,3 +3,10 @@ kobuki/workspace/install/*
 kobuki/workspace/log/*
 .DS_Store
 bags/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python

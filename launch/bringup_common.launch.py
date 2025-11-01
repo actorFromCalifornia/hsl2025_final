@@ -21,6 +21,14 @@ def generate_launch_description():
             'navigation.launch.py',
         ])
     )
+    
+    coverage_launch = PythonLaunchDescriptionSource(
+        PathJoinSubstitution([
+            FindPackageShare('solution_bringup'),
+            'launch',
+            'coverage.launch.py',
+        ])
+    )
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     rtabmap_params_file = LaunchConfiguration('rtabmap_params_file')
@@ -48,6 +56,12 @@ def generate_launch_description():
                 'use_sim_time': use_sim_time,
                 'rtabmap_params_file': rtabmap_params_file,
                 'nav2_params_file': nav2_params_file,
+            }.items(),
+        ),
+        IncludeLaunchDescription(
+            coverage_launch,
+            launch_arguments={
+                'use_sim_time': use_sim_time,
             }.items(),
         ),
         Node(
