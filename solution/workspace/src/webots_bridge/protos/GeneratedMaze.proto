@@ -1,0 +1,172 @@
+#VRML_SIM R2025a utf8
+
+PROTO GeneratedMaze [ ] {
+  Group {
+    children [
+# стартовая змейка
+  Solid {
+    translation 0.5 0.5 0.12
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.0000 0.01500 0.3000 }
+      }
+    ]
+    name "wall0"
+    boundingObject Box { size 1.0000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 0.5 0.375 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 0.25000 0.01500 0.3000 }
+      }
+    ]
+    name "wall1"
+    boundingObject Box { size 0.25000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 1.0 0.125 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 0.25000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 0.25000 0.01500 0.3000 }
+  }
+
+# финишная змейка
+  Solid {
+    translation 0.625 2.5 0.12
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.2500 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 1.2500 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 0.5 2.875 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 0.25000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 0.25000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 1.0 2.625 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 0.25000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 0.25000 0.01500 0.3000 }
+  }
+  
+ # центральный лабиринт
+
+  Solid {
+    translation 1.0 1.0 0.12
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.0000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 1.0000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 0.5 1.5 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.0000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 1.0000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 1.0 2.0 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.0000 0.01500 0.3000 }
+      }
+    ]
+    boundingObject Box { size 1.0000 0.01500 0.3000 }
+  }
+
+
+# внешние стены
+
+  Solid {
+    translation 0.75 0 0.12
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.50000 0.01500 0.3000 }
+      }
+    ]
+    name "border_R"
+    boundingObject Box { size 1.50000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 0.75 3 0.12
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 1.50000 0.01500 0.3000 }
+      }
+    ]
+    name "border_L"
+    boundingObject Box { size 1.50000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 0 1.5 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 3.00000 0.01500 0.3000 }
+      }
+    ]
+    name "border_B"
+    boundingObject Box { size 3.00000 0.01500 0.3000 }
+  }
+
+  Solid {
+    translation 1.5 1.5 0.12
+    rotation 0 0 1 -1.5707953071795862
+    children [
+      Shape {
+        appearance PBRAppearance { baseColor 1 1 1 roughness 0 metalness 0 }
+        geometry Box { size 3.00000 0.01500 0.3000 }
+      }
+    ]
+    name "border_T"
+    boundingObject Box { size 3.00000 0.01500 0.3000 }
+  }
+
+    ]
+  }
+}

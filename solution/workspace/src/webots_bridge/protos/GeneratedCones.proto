@@ -1,0 +1,11 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "../protos/TrafficCone.proto"
+
+PROTO GeneratedCones [ ] {
+  Group {
+    children [
+
+    ]
+  }
+}
