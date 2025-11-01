@@ -86,6 +86,8 @@ smoother_server:
 
 planner_server:
   ros__parameters:
+    global_frame: map
+    robot_base_frame: base_link
     expected_planner_frequency: 1.0
     planner_plugins: ["GridBased"]
     GridBased:
@@ -99,8 +101,8 @@ planner_server:
       w_traversal_cost: 1.0
       w_euc_cost: 0.001
       w_heuristic: 0.001
-      planner_window_x: 6.0
-      planner_window_y: 6.0
+      planner_window_x: 16.0
+      planner_window_y: 16.0
 
 behavior_server:
   ros__parameters:

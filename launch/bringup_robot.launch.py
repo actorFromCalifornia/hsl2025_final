@@ -2,6 +2,7 @@ from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution, ThisLaunchFileDir
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -27,5 +28,21 @@ def generate_launch_description():
         IncludeLaunchDescription(
             sensors_launch,
             launch_arguments={'use_sim_time': 'false'}.items(),
+        ),
+        Node(
+            package='solution_bringup',
+            executable='fixed_goal_node',
+            name='fixed_goal_setter',
+            output='screen',
+            parameters=[
+                {
+                    'use_sim_time': False,
+                    'goal_x': 0.0,
+                    'goal_y': 2.5,
+                    'goal_yaw': 0.0,
+                    'max_attempts': 100,
+                    'retry_radius': 0.1,
+                }
+            ],
         ),
     ])

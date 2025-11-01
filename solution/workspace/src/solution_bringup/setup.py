@@ -21,5 +21,9 @@ setup(
     description='Bringup launch files and parameters for high-level navigation stack.',
     license='MIT',
     tests_require=['pytest'],
-    entry_points={},
+    entry_points={
+        'console_scripts': [
+            'fixed_goal_node = solution_bringup.fixed_goal_node:main',
+        ],
+    },
 )
