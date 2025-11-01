@@ -1,0 +1,25 @@
+<?xml version="1.0" ?>
+<robot name="robot">
+    <webots>
+        <plugin type="webots_bridge.webots_driver.WebotsDriver" />
+        <device reference="lidar" type="Lidar">
+            <ros>
+                <enabled>True</enabled>
+                <topicName>/scan_raw</topicName>
+                <updateRate>10</updateRate>
+                <alwaysOn>True</alwaysOn>
+                <frameName>lidar</frameName>
+            </ros>
+        </device>        
+        <plugin type="webots_ros2_driver::Ros2IMU">
+            <enabled>True</enabled>
+            <topicName>/imu</topicName>
+            <updateRate>10</updateRate>
+            <alwaysOn>True</alwaysOn>
+            <frameName>base_link</frameName>
+            <inertialUnitName>imu</inertialUnitName>
+            <gyroName>gyro</gyroName>
+            <accelerometerName>acc</accelerometerName>
+        </plugin>
+    </webots>
+</robot>

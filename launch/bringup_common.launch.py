@@ -59,22 +59,6 @@ def generate_launch_description():
             }.items(),
         ),
         Node(
-            package='solution_bringup',
-            executable='fixed_goal_node',
-            name='fixed_goal_setter',
-            output='screen',
-            parameters=[
-                {
-                    'use_sim_time': True,
-                    'goal_x': 0.0,
-                    'goal_y': 3.5,
-                    'goal_yaw': 0.0,
-                    'max_attempts': 100,
-                    'retry_radius': 0.1,
-                }
-            ],
-        ),
-        Node(
             package='mark_detector',
             executable='mark_detector_node',
             name='mark_detector_node',
@@ -83,7 +67,7 @@ def generate_launch_description():
                 'use_sim_time': use_sim_time,
             }],
         ),
-        IncludeLaunchDescription(
-            coverage_launch,
-        ),
+        # IncludeLaunchDescription(
+        #     coverage_launch,
+        # ),
     ])
