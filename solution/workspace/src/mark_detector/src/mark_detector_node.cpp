@@ -16,7 +16,7 @@
 
 using namespace std::chrono_literals;
 
-const int ACCUM_FRAMES_COUNT = 3;
+const int ACCUM_FRAMES_COUNT = 5;
 const float INTENSITY_THRESHOLD = 175.0f;
 const float image_resolution = 0.005f;
 
@@ -27,6 +27,7 @@ MarkDetectorNode::MarkDetectorNode()
     mTfBuffer = std::make_shared<tf2_ros::Buffer>(this->get_clock(), std::chrono::seconds(20));
     mTfBuffer->setUsingDedicatedThread(true);
     mTfListener = std::make_shared<tf2_ros::TransformListener>(*mTfBuffer);
+    m_pMarksPublisher = create_publisher<visualization_msgs::msg::Marker>("detected_marks", 1);
     
     // Инициализация аккумулированного облака
     mAccumulatedCloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
@@ -44,7 +45,7 @@ MarkDetectorNode::MarkDetectorNode()
 void MarkDetectorNode::pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
 {
     try {
-        RCLCPP_DEBUG(this->get_logger(), "Received point cloud with %d points", msg->width * msg->height);
+        // RCLCPP_DEBUG(this->get_logger(), "Received point cloud with %d points", msg->width * msg->height);
         
         // Фильтруем точки с высокой интенсивностью
         auto high_intensity_cloud = filterHighIntensityPoints(msg, INTENSITY_THRESHOLD);
@@ -82,7 +83,7 @@ void MarkDetectorNode::pointcloud_callback(const sensor_msgs::msg::PointCloud2::
 void MarkDetectorNode::processAccumulatedPoints()
 {
     if (mPointCloudBuffer.empty()) {
-        RCLCPP_DEBUG(this->get_logger(), "No point clouds to process");
+        // RCLCPP_DEBUG(this->get_logger(), "No point clouds to process");
         return;
     }
     
@@ -98,11 +99,11 @@ void MarkDetectorNode::processAccumulatedPoints()
             *accumulated_pcl_cloud += temp_cloud;
         }
         
-        RCLCPP_INFO(this->get_logger(), "Accumulated %zu points from %zu frames", 
-                   accumulated_pcl_cloud->size(), mPointCloudBuffer.size());
+        // RCLCPP_INFO(this->get_logger(), "Accumulated %zu points from %zu frames", 
+        //            accumulated_pcl_cloud->size(), mPointCloudBuffer.size());
         
         if (accumulated_pcl_cloud->empty()) {
-            RCLCPP_DEBUG(this->get_logger(), "No points accumulated");
+            // RCLCPP_DEBUG(this->get_logger(), "No points accumulated");
             return;
         }
         
@@ -112,12 +113,12 @@ void MarkDetectorNode::processAccumulatedPoints()
         mAccumulatedCloud->header.frame_id = frameId;
         
         if (mAccumulatedCloud->width * mAccumulatedCloud->height == 0) {
-            RCLCPP_DEBUG(this->get_logger(), "No high intensity points found in accumulated clouds");
+            // RCLCPP_DEBUG(this->get_logger(), "No high intensity points found in accumulated clouds");
             return;
         }
         
-        RCLCPP_DEBUG(this->get_logger(), "Found %d high intensity points in accumulated clouds", 
-                    mAccumulatedCloud->width * mAccumulatedCloud->height);
+        // RCLCPP_DEBUG(this->get_logger(), "Found %d high intensity points in accumulated clouds", 
+        //             mAccumulatedCloud->width * mAccumulatedCloud->height);
         
         // Детектируем кластеры точек
         auto clusters = detectPointClusters(mAccumulatedCloud);
@@ -129,13 +130,22 @@ void MarkDetectorNode::processAccumulatedPoints()
             if (clusters[i].size() < 5) { // Минимальный размер кластера
                 continue;
             }
+
+            auto &cluster = clusters[i];
             
+            // Находим плоскость для кластера
+            auto plane = buildPlaneForPoints(cluster);
             // Проецируем точки на плоскость
-            cv::Mat projected_image = projectPointsOnPlane(clusters[i]);
+            cv::Mat projected_image = projectPointsOnPlane(cluster, plane);
             
             if (!projected_image.empty()) {
                 // Сохраняем отладочное изображение
                 saveDebugDebugImage(projected_image);
+                Point3f center;
+                for (auto& p : cluster) {
+                    center += p;
+                }
+                center /= cluster.size();
                 
                 if (m_pMarkRecognizer) {
                     auto detections = m_pMarkRecognizer->detect(projected_image);
@@ -145,15 +155,61 @@ void MarkDetectorNode::processAccumulatedPoints()
                 } else {
                     RCLCPP_WARN(this->get_logger(), "Mark recognizer not initialized");
                 }
+
+                sendMarker(0, center, plane.normal, visualization_msgs::msg::Marker::CUBE, 0, 1, 0);
             }
         }
         
         // Публикуем точки высокой интенсивности
-        mHighIntesityPoints->publish(*high_intensity_cloud);
+        mHighIntesityPoints->publish(*mAccumulatedCloud);
         
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error processing accumulated point clouds: %s", e.what());
     }
+}
+
+void MarkDetectorNode::sendMarker(int id, const Point3f &center, const Point3f &normal, int32_t markerType, float r, float g, float b) {
+    visualization_msgs::msg::Marker marker;
+
+    marker.header.frame_id = "map";
+    marker.header.stamp = rclcpp::Clock().now();
+
+    marker.ns = "marks";
+    marker.id = id;
+
+    marker.type = markerType;
+
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    Point2f n2;
+    n2.x = normal.x;
+    n2.y = normal.y;
+    n2.normalize();
+    double yaw = n2.angle(Point2f{1, 0});
+
+    tf2::Quaternion q;
+    q.setRPY(0, 0, yaw);
+
+    marker.pose.position.x = center.x;
+    marker.pose.position.y = center.y;
+    marker.pose.position.z = center.z;
+    marker.pose.orientation.x = q.x();
+    marker.pose.orientation.y = q.y();
+    marker.pose.orientation.z = q.z();
+    marker.pose.orientation.w = q.w();
+
+    marker.scale.x = 0.01;
+    marker.scale.y = 0.1;
+    marker.scale.z = 0.1;
+
+    marker.color.r = r;
+    marker.color.g = g;
+    marker.color.b = b;
+    marker.color.a = 1.0;
+
+    marker.lifetime = rclcpp::Duration::from_nanoseconds(0);
+
+    m_pMarksPublisher->publish(marker);      
 }
 
 sensor_msgs::msg::PointCloud2::SharedPtr MarkDetectorNode::transformToMapFrame(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
@@ -173,7 +229,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr MarkDetectorNode::transformToMapFrame(c
             try {
                 transform = mTfBuffer->lookupTransform("map", msg->header.frame_id, 
                                                      tf2::TimePointZero);
-                RCLCPP_INFO(this->get_logger(), "Using latest available transform");
+//                RCLCPP_INFO(this->get_logger(), "Using latest available transform");
             } catch (tf2::TransformException &ex2) {
                 RCLCPP_ERROR(this->get_logger(), "Cannot get transform even with latest time: %s", ex2.what());
                 return nullptr;
@@ -260,7 +316,7 @@ sensor_msgs::msg::PointCloud2::SharedPtr MarkDetectorNode::filterHighIntensityPo
     // Конвертируем обратно в ROS сообщение
     pcl::toROSMsg(*filtered_pcl_cloud, *filtered_cloud);
     filtered_cloud->header = msg->header;
-    
+
     return filtered_cloud;
 }
 
@@ -308,12 +364,11 @@ std::vector<std::vector<PointXYZI>> MarkDetectorNode::detectPointClusters(
     return clusters;
 }
 
-cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &points)
-{
+Plane MarkDetectorNode::buildPlaneForPoints(const std::vector<PointXYZI> &points) {
     if (points.size() < 3) {
-        return cv::Mat();
+        return Plane();
     }
-    
+
     try {
         // Конвертируем точки в PCL формат
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZ>);
@@ -339,7 +394,7 @@ cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &poi
         
         if (inliers->indices.size() < 3) {
             RCLCPP_WARN(this->get_logger(), "Not enough inliers for plane fitting");
-            return cv::Mat();
+            return Plane();
         }
         
         // Извлекаем параметры плоскости
@@ -367,7 +422,26 @@ cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &poi
             plane_point.y = 0;
             plane_point.z = 0;
         }
-        
+
+        Plane plane;
+        plane.normal = normal;
+        plane.point = plane_point;
+        return plane;
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Failed to build plane: %s", e.what());
+        return Plane();
+    }
+}
+
+cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &points, const Plane &plane)
+{
+    if (points.size() < 3 || plane.normal.length() < 0.01) {
+        return cv::Mat();
+    }
+    
+    try {
+        auto normal = plane.normal;
+        auto plane_point = plane.point;
         // Создаем систему координат на плоскости
         Point3f u_axis, v_axis;
         
@@ -436,7 +510,7 @@ void MarkDetectorNode::saveDebugDebugImage(const cv::Mat &image)
     try {
         std::string filename = "/workspace/docker_ws/marks/mark_cluster_" + std::to_string(mNextDebugImageIndex++) + ".png";
         cv::imwrite(filename, image);
-        RCLCPP_DEBUG(this->get_logger(), "Saved debug image: %s", filename.c_str());
+        // RCLCPP_DEBUG(this->get_logger(), "Saved debug image: %s", filename.c_str());
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Error saving debug image: %s", e.what());
     }
