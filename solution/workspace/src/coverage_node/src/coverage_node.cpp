@@ -13,6 +13,8 @@ CoverageNode::CoverageNode()
   grid_height_cells_(8),
   cell_selection_interval_(2.0),
   last_selection_time_(this->now()),
+  visualization_interval_(0.5),
+  last_visualization_time_(this->now()),
   grid_origin_x_(0.0),
   grid_origin_y_(0.0)
 {
@@ -76,8 +78,11 @@ void CoverageNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
     last_selection_time_ = current_time;
   }
   
-  // Publish grid visualization
-  publish_grid_visualization();
+  // Publish grid visualization (throttled)
+  if ((current_time - last_visualization_time_).seconds() >= visualization_interval_) {
+    publish_grid_visualization();
+    last_visualization_time_ = current_time;
+  }
 }
 
 double CoverageNode::cell_distance(const CellCoord& cell1, const CellCoord& cell2) const
@@ -221,21 +226,8 @@ void CoverageNode::select_next_cell()
 
 void CoverageNode::publish_grid_visualization()
 {
-  // Grid origin is always fixed at (0, 0), no need to check
-  
+  // No DELETEALL - use unique marker IDs to update markers smoothly
   rclcpp::Time now = this->now();
-  
-  // First, delete all previous markers
-  auto delete_msg = std::make_shared<visualization_msgs::msg::MarkerArray>();
-  visualization_msgs::msg::Marker delete_all;
-  delete_all.header.frame_id = "map";
-  delete_all.header.stamp = now;
-  delete_all.action = visualization_msgs::msg::Marker::DELETEALL;
-  delete_msg->markers.push_back(delete_all);
-  grid_pub_->publish(*delete_msg);
-  
-  // Small delay to ensure DELETEALL is processed
-  std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
   // Use fixed grid size: 8x4 cells
   int cells_x = grid_width_cells_;

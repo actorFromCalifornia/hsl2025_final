@@ -86,6 +86,10 @@ private:
   // Coverage algorithm parameters
   double cell_selection_interval_;
   rclcpp::Time last_selection_time_;
+  
+  // Visualization throttling
+  rclcpp::Time last_visualization_time_;
+  double visualization_interval_;
 
 };
 
