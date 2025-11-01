@@ -21,9 +21,9 @@ TexturedBackground { }
 TexturedBackgroundLight { }
 
 RectangleArena {
-  floorSize 1.5 3
+  floorSize 4 8
   wallHeight 0.4
-  translation 0.75 1.5 0
+  translation 2.0 4.0 0
 }
 
 # Maze
