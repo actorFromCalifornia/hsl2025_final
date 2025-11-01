@@ -12,6 +12,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include <vector>
 #include <cmath>
@@ -41,9 +42,10 @@ private:
     void pointcloud_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg);
     sensor_msgs::msg::PointCloud2::SharedPtr filterHighIntensityPoints(const sensor_msgs::msg::PointCloud2::SharedPtr msg, float intensityThreshold);
     std::vector<std::vector<PointXYZI>> detectPointClusters(sensor_msgs::msg::PointCloud2::SharedPtr);
-    cv::Mat projectPointsOnPlane(const std::vector<PointXYZI> &points);
+    Plane buildPlaneForPoints(const std::vector<PointXYZI> &points);
+    cv::Mat projectPointsOnPlane(const std::vector<PointXYZI> &points, const Plane &plane);
     void saveDebugDebugImage(const cv::Mat &image);
-    sensor_msgs::msg::PointCloud2::SharedPtr transformToMapFrame(const sensor_msgs::msg::PointCloud2::SharedPtr cloud);
+    void sendMarker(int id, const Point3f &center, const Point3f &normal, int32_t markerType, float r, float g, float b);    sensor_msgs::msg::PointCloud2::SharedPtr transformToMapFrame(const sensor_msgs::msg::PointCloud2::SharedPtr cloud);
     void processAccumulatedPoints();
     geometry_msgs::msg::Point transformPoint(const geometry_msgs::msg::Point& point, const geometry_msgs::msg::TransformStamped& transform);
 
@@ -62,4 +64,5 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> mTfListener;
 
     std::shared_ptr<MarkRecognizer> m_pMarkRecognizer;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_pMarksPublisher;
 };

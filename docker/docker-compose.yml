@@ -48,6 +48,7 @@ services:
     network_mode: "host"
     volumes:
       - ../docker_ws:/workspace/docker_ws
+      - /dev:/dev 
     command: >
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
                      source /kobuki_ws/install/setup.bash && \
