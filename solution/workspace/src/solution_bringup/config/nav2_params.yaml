@@ -98,14 +98,13 @@ smoother_server:
 
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 2.0
-    planner_plugins: ["NavfnPlanner"]
-    NavfnPlanner:
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    GridBased:
       plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.125
+      tolerance: 0.5
       use_astar: true          # Использовать ли A* (если false — будет Dijkstra)
       allow_unknown: true      # Разрешить ли прокладывание маршрута через неизвестные клетки
-      use_final_approach_orientation: false
 
 behavior_server:
   ros__parameters:
@@ -153,7 +152,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
         cost_scaling_factor: 8.0
-        inflation_radius: 0.15
+        inflation_radius: 0.4
         inflate_unknown: false
         inflate_around_unknown: false
       robot_radius: 0.17
@@ -189,7 +188,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
         cost_scaling_factor: 8.0
-        inflation_radius: 0.15
+        inflation_radius: 0.4
         inflate_unknown: false
         inflate_around_unknown: false
       robot_radius: 0.17

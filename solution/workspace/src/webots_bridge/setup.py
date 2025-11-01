@@ -26,16 +26,11 @@ data_files.append(('share/' + package_name + '/bounding_objects/protos', [
     ]))
 data_files.append(('share/' + package_name + '/protos', [
     'protos/TrafficCone.proto',
-    'protos/CobraFlex.proto',
     'protos/GeneratedMaze.proto',
     'protos/GeneratedCones.proto',
     ]))
 data_files.append(('share/' + package_name + '/protos/textures', [
     'protos/textures/cone.jpg',
-    ]))
-data_files.append(('share/' + package_name + '/protos/meshes', [
-    'protos/meshes/robot_body.stl',
-    'protos/meshes/wheel_cobra.stl',
     ]))
 data_files.append(('share/' + package_name + '/appearances/protos', [
     'appearances/protos/BrushedAluminium.proto',
