@@ -18,13 +18,14 @@ using namespace std::chrono_literals;
 
 const int ACCUM_FRAMES_COUNT = 3;
 const float INTENSITY_THRESHOLD = 175.0f;
-const int image_size = 32;
+const float image_resolution = 0.005f;
 
 MarkDetectorNode::MarkDetectorNode()
 : Node("mark_detector_node"), mNextDebugImageIndex(0), mFrameCounter(0)
 {
     // Инициализация TF2
-    mTfBuffer = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+    mTfBuffer = std::make_shared<tf2_ros::Buffer>(this->get_clock(), std::chrono::seconds(20));
+    mTfBuffer->setUsingDedicatedThread(true);
     mTfListener = std::make_shared<tf2_ros::TransformListener>(*mTfBuffer);
     
     // Инициализация аккумулированного облака
@@ -45,9 +46,12 @@ void MarkDetectorNode::pointcloud_callback(const sensor_msgs::msg::PointCloud2::
     try {
         RCLCPP_DEBUG(this->get_logger(), "Received point cloud with %d points", msg->width * msg->height);
         
+        // Фильтруем точки с высокой интенсивностью
+        auto high_intensity_cloud = filterHighIntensityPoints(msg, INTENSITY_THRESHOLD);
+
         // Преобразуем облако в фрейм map (используем текущее время вместо времени сообщения)
-//        auto transformed_cloud = transformToMapFrame(msg);
-        auto transformed_cloud = msg;
+        auto transformed_cloud = transformToMapFrame(high_intensity_cloud);
+        // auto transformed_cloud = msg;
         if (!transformed_cloud) {
             RCLCPP_WARN(this->get_logger(), "Failed to transform point cloud to map frame");
             return;
@@ -107,19 +111,16 @@ void MarkDetectorNode::processAccumulatedPoints()
         mAccumulatedCloud->header.stamp = stamp;
         mAccumulatedCloud->header.frame_id = frameId;
         
-        // Фильтруем точки с высокой интенсивностью
-        auto high_intensity_cloud = filterHighIntensityPoints(mAccumulatedCloud, INTENSITY_THRESHOLD);
-        
-        if (high_intensity_cloud->width * high_intensity_cloud->height == 0) {
+        if (mAccumulatedCloud->width * mAccumulatedCloud->height == 0) {
             RCLCPP_DEBUG(this->get_logger(), "No high intensity points found in accumulated clouds");
             return;
         }
         
         RCLCPP_DEBUG(this->get_logger(), "Found %d high intensity points in accumulated clouds", 
-                    high_intensity_cloud->width * high_intensity_cloud->height);
+                    mAccumulatedCloud->width * mAccumulatedCloud->height);
         
         // Детектируем кластеры точек
-        auto clusters = detectPointClusters(high_intensity_cloud);
+        auto clusters = detectPointClusters(mAccumulatedCloud);
         
         RCLCPP_INFO(this->get_logger(), "Detected %zu clusters in accumulated clouds", clusters.size());
         
@@ -162,9 +163,9 @@ sensor_msgs::msg::PointCloud2::SharedPtr MarkDetectorNode::transformToMapFrame(c
         geometry_msgs::msg::TransformStamped transform;
         try {
             // Используем текущее время для трансформации вместо времени сообщения
-           rclcpp::Time now = this->now();
+            rclcpp::Time now = this->now();
             transform = mTfBuffer->lookupTransform("map", msg->header.frame_id, 
-                                                 now, rclcpp::Duration::from_seconds(1.0));
+                                                 msg->header.stamp, rclcpp::Duration::from_seconds(10.0));
         } catch (tf2::TransformException &ex) {
             RCLCPP_WARN(this->get_logger(), "TF transform failed: %s", ex.what());
             
@@ -402,16 +403,19 @@ cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &poi
         
         float range_u = max_u - min_u + 2 * margin;
         float range_v = max_v - min_v + 2 * margin;
-        float scale = image_size / std::max(range_u, range_v);
+        int image_width = static_cast<int>(range_u / image_resolution);
+        int image_height = static_cast<int>(range_v / image_resolution);
+        float scale_x = image_width / range_u;
+        float scale_y = image_height / range_v;
         
-        cv::Mat image(image_size, image_size, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Mat image(image_height, image_width, CV_8UC3, cv::Scalar(0, 0, 0));
         
         for (const auto& proj_point : projected_points) {
-            int x = static_cast<int>((proj_point.x - min_u + margin) * scale);
-            int y = static_cast<int>((proj_point.y - min_v + margin) * scale);
+            int x = static_cast<int>((proj_point.x - min_u + margin) * scale_x);
+            int y = static_cast<int>((proj_point.y - min_v + margin) * scale_y);
             
-            if (x >= 0 && x < image_size && y >= 0 && y < image_size) {
-                cv::circle(image, cv::Point(x, image_size - y - 1), 2, cv::Scalar(0, 255, 0), -1);
+            if (x >= 0 && x < image_width && y >= 0 && y < image_height) {
+                cv::circle(image, cv::Point(x, image_height - y - 1), 2, cv::Scalar(0, 255, 0), -1);
             }
         }
         
