@@ -11,7 +11,7 @@ def generate_launch_description():
     robot_description_path = os.path.join(package_dir, 'resource', 'webots_bridge.urdf')
 
     webots = WebotsLauncher(
-        world=os.path.join(package_dir, 'worlds', 'cobra_flex_demo.wbt')
+        world=os.path.join(package_dir, 'worlds', 'hsl_maze.wbt')
     )
 
     my_robot_driver = WebotsController(
