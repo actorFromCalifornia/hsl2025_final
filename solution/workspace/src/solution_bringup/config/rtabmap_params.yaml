@@ -1,4 +1,4 @@
-/**:
+rtabmap:
   ros__parameters:
     # Common parameters - все как строки
     frame_id: "base_link"
@@ -14,20 +14,7 @@
     subscribe_scan: true
     subscribe_scan_cloud: false
     scan_topic: "/scan"
-    scan_cloud: true  # Use point cloud instead of 2D laser scan
-
-    # Use ICP odometry - ВСЕ значения как строки
-    Reg/Strategy: "1"  # "0"=Visual, "1"=ICP, "2"=Visual+ICP
-    Reg/Force3DoF: "true"
-    Icp/Strategy: "1"  # "0"=PointToPlane, "1"=PointToPoint
-    Icp/VoxelSize: "0.03"
-    Icp/Iterations: "10"
-    Icp/CorrespondenceRatio: "0.05"
-    Icp/MaxCorrespondenceDistance: "0.5"
-    Icp/OutlierRatio: "0.85"
-    Icp/CorrespondenceReduction: "true"
-    Icp/PM: "true"  # Probability Mapping
-    Icp/PMOutlierRatio: "0.7"
+    scan_cloud: false  # Use point cloud instead of 2D laser scan
 
     # RGBD settings
     RGBD/ProximityPathMaxNeighbors: "0"
@@ -85,3 +72,33 @@
 
     Rtabmap/DetectionRate: "5"
     Rtabmap/TimeThr: "0.2"
+
+icp_odometry:
+  ros__parameters:
+    frame_id: "base_link"
+    odom_frame_id: "icp_odom"
+    map_frame_id: "map"
+    
+    # RGBG configuration
+    subscribe_rgb: false
+    subscribe_depth: false
+    subscribe_rgbd: false
+
+    # LiDAR configuration
+    subscribe_scan: true
+    subscribe_scan_cloud: false
+    scan_topic: "/scan"
+    scan_cloud: false  # Use point cloud instead of 2D laser scan
+
+    # Use ICP odometry - ВСЕ значения как строки
+    Reg/Strategy: "1"  # "0"=Visual, "1"=ICP, "2"=Visual+ICP
+    Reg/Force3DoF: "true"
+    Icp/Strategy: "1"  # "0"=PointToPlane, "1"=PointToPoint
+    Icp/VoxelSize: "0.03"
+    Icp/Iterations: "10"
+    Icp/CorrespondenceRatio: "0.05"
+    Icp/MaxCorrespondenceDistance: "0.5"
+    Icp/OutlierRatio: "0.85"
+    Icp/CorrespondenceReduction: "true"
+    Icp/PM: "true"  # Probability Mapping
+    Icp/PMOutlierRatio: "0.7"

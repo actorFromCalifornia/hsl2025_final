@@ -5,6 +5,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     container_name: hsl2025-foxglove
+    profiles: ["foxglove"]
     command: >
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
                      source /kobuki_ws/install/setup.bash && \

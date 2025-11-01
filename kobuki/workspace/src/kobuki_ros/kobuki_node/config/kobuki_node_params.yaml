@@ -6,9 +6,9 @@ kobuki_ros_node:
     battery_dangerous: 13.2
     device_port: /dev/kobuki
     cmd_vel_timeout_sec: 0.6
-    odom_frame: odom
+    odom_frame: robot_odom
     base_frame: base_link
-    publish_tf: true
+    publish_tf: false
     use_imu_heading: true
     wheel_left_joint_name: wheel_left_joint
     wheel_right_joint_name: wheel_right_joint
