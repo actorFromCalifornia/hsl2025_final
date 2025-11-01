@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-navigation2 \
     ros-${ROS_DISTRO}-nav2-bringup \
     ros-${ROS_DISTRO}-tf-transformations \
+    ros-${ROS_DISTRO}-pointcloud-to-laserscan \
     ros-${ROS_DISTRO}-rosbag2 \
     ros-${ROS_DISTRO}-foxglove-bridge \
     python3-colcon-common-extensions \

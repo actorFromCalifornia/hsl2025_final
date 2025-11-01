@@ -1,8 +1,8 @@
-rtabmap:
+/**:
   ros__parameters:
     # Common parameters - все как строки
     frame_id: "base_link"
-    odom_frame_id: "odom"
+    odom_frame_id: "icp_odom"
     map_frame_id: "map"
 
     # RGBG configuration
@@ -11,22 +11,17 @@ rtabmap:
     subscribe_rgbd: false
 
     # LiDAR configuration
-    subscribe_scan: false
-    subscribe_scan_cloud: true
-    scan_topic: "/livox/lidar"
+    subscribe_scan: true
+    subscribe_scan_cloud: false
+    scan_topic: "/scan"
     scan_cloud: true  # Use point cloud instead of 2D laser scan
-
-    # IMU configuration
-    subscribe_imu: false
-    imu_topic: "/livox/imu"
-    ImuFilter: "1"  # "0"=No filter, "1"=Madgwick, "2"=Complementary
 
     # Use ICP odometry - ВСЕ значения как строки
     Reg/Strategy: "1"  # "0"=Visual, "1"=ICP, "2"=Visual+ICP
     Reg/Force3DoF: "true"
     Icp/Strategy: "1"  # "0"=PointToPlane, "1"=PointToPoint
-    Icp/VoxelSize: "0.02"
-    Icp/Iterations: "100"
+    Icp/VoxelSize: "0.03"
+    Icp/Iterations: "10"
     Icp/CorrespondenceRatio: "0.05"
     Icp/MaxCorrespondenceDistance: "0.5"
     Icp/OutlierRatio: "0.85"
@@ -41,7 +36,7 @@ rtabmap:
     Odom/Strategy: "1"  # "1" = F2M (Frame-to-Map) ICP
     Odom/F2M/BundleAdjustment: "true"
     Odom/ScanKeyFrameThr: "0.6"
-    Odom/F2M/ScanMaxSize: "10000"
+    Odom/F2M/ScanMaxSize: "5000"
 
     # Map configuration
     Grid/FromDepth: "false"
@@ -56,11 +51,6 @@ rtabmap:
     Grid/Global: "true"
     Grid/RayTracing: "true"
     Grid/Updated: "true"
-
-    # Параметры фильтрации облака точек 
-    scan_cloud_max_points: 0 # 0=без ограничения, >0=макс. количество точек 
-    scan_cloud_min_range: 0.4 # Минимальная дальность 
-    scan_cloud_max_range: 10.0 # Максимальная дальность
 
     # Memory management - ВСЕ как строки
     Mem/ImagePreDecimation: "1"

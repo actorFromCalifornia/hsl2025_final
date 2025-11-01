@@ -12,10 +12,16 @@ def generate_launch_description():
 
     default_rtabmap_params = os.path.join(bringup_share, 'config', 'rtabmap_params.yaml')
     default_nav2_params = os.path.join(bringup_share, 'config', 'nav2_params.yaml')
+    default_pointcloud_to_laserscan_params = os.path.join(
+        bringup_share, 'config', 'pointcloud_to_laserscan.yaml'
+    )
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     rtabmap_params_file = LaunchConfiguration('rtabmap_params_file')
     nav2_params_file = LaunchConfiguration('nav2_params_file')
+    pointcloud_to_laserscan_params_file = LaunchConfiguration(
+        'pointcloud_to_laserscan_params_file'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -33,6 +39,22 @@ def generate_launch_description():
             default_value=default_nav2_params,
             description='Full path to the Nav2 parameters file.'
         ),
+        DeclareLaunchArgument(
+            'pointcloud_to_laserscan_params_file',
+            default_value=default_pointcloud_to_laserscan_params,
+            description='Full path to the pointcloud_to_laserscan parameters file.'
+        ),
+        Node(
+            package='pointcloud_to_laserscan',
+            executable='pointcloud_to_laserscan_node',
+            name='pointcloud_to_laserscan',
+            output='screen',
+            parameters=[pointcloud_to_laserscan_params_file, {'use_sim_time': use_sim_time}],
+            remappings=[
+                ('cloud_in', '/livox/lidar'),
+                ('scan', '/scan'),
+            ],
+        ),
         Node(
             package='rtabmap_slam',
             executable='rtabmap',
@@ -41,7 +63,6 @@ def generate_launch_description():
             parameters=[rtabmap_params_file, {'use_sim_time': use_sim_time}],
             remappings=[
                 ('scan', '/scan'),
-                ('scan_cloud', '/livox/lidar'),
                 ('map', '/rtabmap_map'),
                 ('imu', '/livox/imu'),
                 ('odom_info', '/rtabmap/odom_info'),
@@ -54,9 +75,10 @@ def generate_launch_description():
             executable='icp_odometry',
             name='icp_odometry',
             output='screen',
-            parameters=[rtabmap_params_file],
+            parameters=[rtabmap_params_file, {'use_sim_time': use_sim_time}],
             remappings=[
                 ('scan', '/scan'),
+                ('imu', '/livox/imu'),
                 ('odom', '/icp_odom'),
             ]
         ),
