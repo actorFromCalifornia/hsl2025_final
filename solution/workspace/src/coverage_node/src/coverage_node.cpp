@@ -16,7 +16,11 @@ CoverageNode::CoverageNode()
   visualization_interval_(0.5),
   last_visualization_time_(this->now()),
   grid_origin_x_(0.0),
-  grid_origin_y_(0.0)
+  grid_origin_y_(0.0),
+  node_state_(NodeState::COVERAGE),
+  pending_marker_id_(-1),
+  canceling_for_marker_(false),
+  canceling_for_new_cell_(false)
 {
   // Declare parameters
   this->declare_parameter("grid_width_cells", 4);
@@ -37,12 +41,23 @@ CoverageNode::CoverageNode()
     "/icp_odom", 10,
     std::bind(&CoverageNode::odom_callback, this, std::placeholders::_1));
 
+  // Marker subscription
+  marker_sub_ = this->create_subscription<visualization_msgs::msg::Marker>(
+    "detected_marks", 10,
+    std::bind(&CoverageNode::marker_callback, this, std::placeholders::_1));
+
   grid_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
     "/coverage_node/grid", 1);
   
   // Nav2 action client
   nav2_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
     this, "navigate_to_pose");
+  
+  // Timer for waiting at marker (5 seconds)
+  marker_wait_timer_ = this->create_wall_timer(
+    std::chrono::seconds(5),
+    std::bind(&CoverageNode::marker_wait_timer_callback, this));
+  marker_wait_timer_->cancel(); // Start canceled, will be activated when needed
 }
 
 CellCoord CoverageNode::world_to_cell(double x, double y, double origin_x, double origin_y) const
@@ -123,11 +138,19 @@ void CoverageNode::send_nav2_goal(const CellCoord& cell)
     return;
   }
   
-  // Cancel previous goal if exists
+  // Cancel previous goal if exists (mark that we're canceling for new cell, not error)
   if (current_goal_handle_) {
-    RCLCPP_DEBUG(this->get_logger(), "Cancelling previous goal");
+    // Save the cell that will be canceled before we change selected_cell_
+    if (selected_cell_.has_value()) {
+      canceled_cell_ = selected_cell_.value();
+    }
+    RCLCPP_DEBUG(this->get_logger(), "Cancelling previous goal for new cell (%d, %d)", cell.x, cell.y);
+    canceling_for_new_cell_ = true;
     nav2_client_->async_cancel_goal(current_goal_handle_);
   }
+  
+  // Update selected cell before sending new goal
+  selected_cell_ = cell;
   
   auto goal_msg = nav2_msgs::action::NavigateToPose::Goal();
   goal_msg.pose = cell_to_pose(cell);
@@ -174,28 +197,87 @@ void CoverageNode::nav2_result_callback(
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
       RCLCPP_INFO(this->get_logger(), "Nav2 goal succeeded - reached target");
+      
+      // If we just reached the marker, start waiting
+      if (node_state_ == NodeState::GOING_TO_MARKER) {
+        RCLCPP_INFO(this->get_logger(), "Marker ID %d reached, starting 5 second wait", pending_marker_id_);
+        // Mark this marker as visited
+        visited_marker_ids_.insert(pending_marker_id_);
+        node_state_ = NodeState::WAITING_AT_MARKER;
+        marker_wait_timer_->reset(); // Start the 5 second timer
+        // Clear pending marker
+        pending_marker_pose_.reset();
+        pending_marker_id_ = -1;
+      }
+      // If we reached a cell goal and we're in coverage mode, continue coverage
+      else if (node_state_ == NodeState::COVERAGE) {
+        // Continue coverage - select next cell will be called by periodic timer
+        RCLCPP_DEBUG(this->get_logger(), "Cell goal reached, continuing coverage");
+      }
       break;
     case rclcpp_action::ResultCode::ABORTED:
       RCLCPP_WARN(this->get_logger(), "Nav2 goal aborted");
-      // Mark current selected cell as aborted
-      if (selected_cell_.has_value()) {
-        aborted_cells_.insert(selected_cell_.value());
-        RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as aborted", 
-                    selected_cell_.value().x, selected_cell_.value().y);
+      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell)
+      if (!canceling_for_marker_ && !canceling_for_new_cell_) {
+        // Use canceled_cell_ if available (the cell that was actually canceled), otherwise use selected_cell_
+        CellCoord cell_to_mark = canceled_cell_.has_value() ? canceled_cell_.value() : 
+                                 (selected_cell_.has_value() ? selected_cell_.value() : CellCoord(-1, -1));
+        if (cell_to_mark.x >= 0 && cell_to_mark.y >= 0) {
+          aborted_cells_.insert(cell_to_mark);
+          RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as aborted", 
+                      cell_to_mark.x, cell_to_mark.y);
+        }
+      } else if (canceling_for_new_cell_) {
+        RCLCPP_DEBUG(this->get_logger(), "Goal canceled for new cell - previous cell not marked as aborted");
       }
-      // Try to select a new cell
-      select_next_cell();
+      // Clear canceled_cell_ and reset canceling flags
+      canceled_cell_.reset();
+      canceling_for_marker_ = false;
+      canceling_for_new_cell_ = false;
+      // If aborted while going to marker, return to coverage mode
+      if (node_state_ == NodeState::GOING_TO_MARKER) {
+        RCLCPP_WARN(this->get_logger(), "Marker ID %d goal aborted, returning to coverage mode", pending_marker_id_);
+        node_state_ = NodeState::COVERAGE;
+        pending_marker_pose_.reset();
+        pending_marker_id_ = -1;
+      }
+      // Try to select a new cell if in coverage mode
+      if (node_state_ == NodeState::COVERAGE) {
+        select_next_cell();
+      }
       break;
     case rclcpp_action::ResultCode::CANCELED:
       RCLCPP_INFO(this->get_logger(), "Nav2 goal canceled");
-      // Mark current selected cell as aborted
-      if (selected_cell_.has_value()) {
-        aborted_cells_.insert(selected_cell_.value());
-        RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as canceled", 
-                    selected_cell_.value().x, selected_cell_.value().y);
+      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell)
+      if (!canceling_for_marker_ && !canceling_for_new_cell_) {
+        // Use canceled_cell_ if available (the cell that was actually canceled), otherwise use selected_cell_
+        CellCoord cell_to_mark = canceled_cell_.has_value() ? canceled_cell_.value() : 
+                                 (selected_cell_.has_value() ? selected_cell_.value() : CellCoord(-1, -1));
+        if (cell_to_mark.x >= 0 && cell_to_mark.y >= 0) {
+          aborted_cells_.insert(cell_to_mark);
+          RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as canceled", 
+                      cell_to_mark.x, cell_to_mark.y);
+        }
+      } else if (canceling_for_marker_) {
+        RCLCPP_DEBUG(this->get_logger(), "Goal canceled for marker - cell not marked as aborted");
+      } else if (canceling_for_new_cell_) {
+        RCLCPP_DEBUG(this->get_logger(), "Goal canceled for new cell - previous cell not marked as aborted");
       }
-      // Try to select a new cell
-      select_next_cell();
+      // Clear canceled_cell_ and reset canceling flags
+      canceled_cell_.reset();
+      canceling_for_marker_ = false;
+      canceling_for_new_cell_ = false;
+      // If canceled while going to marker, return to coverage mode
+      if (node_state_ == NodeState::GOING_TO_MARKER) {
+        RCLCPP_INFO(this->get_logger(), "Marker ID %d goal canceled, returning to coverage mode", pending_marker_id_);
+        node_state_ = NodeState::COVERAGE;
+        pending_marker_pose_.reset();
+        pending_marker_id_ = -1;
+      }
+      // Try to select a new cell if in coverage mode
+      if (node_state_ == NodeState::COVERAGE) {
+        select_next_cell();
+      }
       break;
     default:
       RCLCPP_WARN(this->get_logger(), "Nav2 goal ended with unknown result code");
@@ -206,6 +288,11 @@ void CoverageNode::nav2_result_callback(
 
 void CoverageNode::select_next_cell()
 {
+  // Only select cells when in COVERAGE mode
+  if (node_state_ != NodeState::COVERAGE) {
+    return;
+  }
+  
   if (!current_robot_cell_.has_value()) {
     return;
   }
@@ -251,8 +338,6 @@ void CoverageNode::select_next_cell()
     RCLCPP_INFO(this->get_logger(), "Selected next cell: (%d, %d), distance: %.2f, robot at cell: (%d, %d)", 
                 new_cell.x, new_cell.y, min_distance, robot_cell.x, robot_cell.y);
     
-    selected_cell_ = best_cell;
-    
     // Send goal to Nav2 if this is a new cell
     if (previous_selected != new_cell) {
       RCLCPP_INFO(this->get_logger(), "New cell selected, sending Nav2 goal");
@@ -260,10 +345,110 @@ void CoverageNode::select_next_cell()
     } else {
       RCLCPP_DEBUG(this->get_logger(), "Same cell selected again, not sending new goal");
     }
+    // Note: selected_cell_ is updated inside send_nav2_goal after canceling previous goal
   } else {
     RCLCPP_INFO(this->get_logger(), "All cells visited! Coverage complete.");
     selected_cell_.reset();
   }
+}
+
+void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::SharedPtr msg)
+{
+  // Process marker detection
+  if (msg->action == visualization_msgs::msg::Marker::ADD && 
+      msg->ns == "marks") {
+    
+    int marker_id = msg->id;
+    
+    // Skip if this marker has already been visited
+    if (visited_marker_ids_.find(marker_id) != visited_marker_ids_.end()) {
+      RCLCPP_DEBUG(this->get_logger(), "Marker ID %d already visited, ignoring", marker_id);
+      return;
+    }
+    
+    // Skip if we're already going to a marker (or waiting at one)
+    if (node_state_ == NodeState::GOING_TO_MARKER || node_state_ == NodeState::WAITING_AT_MARKER) {
+      RCLCPP_DEBUG(this->get_logger(), "Marker ID %d detected but already processing marker ID %d, ignoring", 
+                   marker_id, pending_marker_id_);
+      return;
+    }
+    
+    RCLCPP_INFO(this->get_logger(), "Marker ID %d detected at (%.2f, %.2f, %.2f)", 
+                marker_id, msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
+    
+    // Cancel current goal if exists (mark that we're canceling for marker, not error)
+    if (current_goal_handle_) {
+      // Save the cell that will be canceled before we clear selected_cell_
+      if (selected_cell_.has_value()) {
+        canceled_cell_ = selected_cell_.value();
+      }
+      RCLCPP_INFO(this->get_logger(), "Cancelling current goal to go to marker ID %d", marker_id);
+      canceling_for_marker_ = true;
+      nav2_client_->async_cancel_goal(current_goal_handle_);
+      // Don't reset current_goal_handle_ here - let the result callback handle it
+    }
+    
+    // Clear selected cell since we're interrupting coverage (but don't mark as aborted)
+    if (selected_cell_.has_value()) {
+      RCLCPP_DEBUG(this->get_logger(), "Clearing selected cell to go to marker");
+      selected_cell_.reset();
+    }
+    
+    // Save marker position and ID
+    geometry_msgs::msg::PoseStamped marker_pose;
+    marker_pose.header = msg->header;
+    marker_pose.pose = msg->pose;
+    pending_marker_pose_ = marker_pose;
+    pending_marker_id_ = marker_id;
+    
+    // Switch to marker mode and send goal immediately
+    node_state_ = NodeState::GOING_TO_MARKER;
+    RCLCPP_INFO(this->get_logger(), "Switching to marker mode, sending goal to marker ID %d", marker_id);
+    send_nav2_goal_to_marker(marker_pose);
+  }
+}
+
+void CoverageNode::send_nav2_goal_to_marker(const geometry_msgs::msg::PoseStamped& pose)
+{
+  if (!nav2_client_->wait_for_action_server(std::chrono::seconds(1))) {
+    RCLCPP_WARN(this->get_logger(), "Nav2 action server not available, cannot send marker goal");
+    node_state_ = NodeState::COVERAGE;
+    return;
+  }
+  
+  // Cancel previous goal if exists
+  if (current_goal_handle_) {
+    RCLCPP_DEBUG(this->get_logger(), "Cancelling previous goal before marker");
+    nav2_client_->async_cancel_goal(current_goal_handle_);
+  }
+  
+  auto goal_msg = nav2_msgs::action::NavigateToPose::Goal();
+  goal_msg.pose = pose;
+  
+  RCLCPP_INFO(this->get_logger(), "Sending Nav2 goal to marker: pose (%.2f, %.2f, %.2f)", 
+              pose.pose.position.x, 
+              pose.pose.position.y,
+              pose.pose.position.z);
+  
+  auto send_goal_options = rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
+  send_goal_options.goal_response_callback =
+    std::bind(&CoverageNode::nav2_goal_response_callback, this, std::placeholders::_1);
+  send_goal_options.feedback_callback =
+    std::bind(&CoverageNode::nav2_feedback_callback, this, std::placeholders::_1, std::placeholders::_2);
+  send_goal_options.result_callback =
+    std::bind(&CoverageNode::nav2_result_callback, this, std::placeholders::_1);
+  
+  nav2_client_->async_send_goal(goal_msg, send_goal_options);
+  RCLCPP_INFO(this->get_logger(), "Nav2 goal to marker sent asynchronously");
+}
+
+void CoverageNode::marker_wait_timer_callback()
+{
+  RCLCPP_INFO(this->get_logger(), "Marker wait completed, returning to coverage mode");
+  marker_wait_timer_->cancel();
+  node_state_ = NodeState::COVERAGE;
+  // Resume coverage algorithm
+  select_next_cell();
 }
 
 // Map callback removed - grid visualization published from odom_callback
