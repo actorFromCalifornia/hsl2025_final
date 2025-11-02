@@ -35,7 +35,7 @@ CoverageNode::CoverageNode()
   // Grid origin is fixed - bottom-left corner of cell (0, 0) will be at world (0, 0)
   // No rotation needed - simple direct coordinates
   grid_origin_x_ = 0.0 - 0.25 * cell_size_;
-  grid_origin_y_ = 0.0 - 1.5 * cell_size_;
+  grid_origin_y_ = 0.0 - 0.5 * cell_size_;
   
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "/icp_odom", 10,
