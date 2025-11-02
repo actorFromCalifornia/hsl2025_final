@@ -20,6 +20,20 @@ const int ACCUM_FRAMES_COUNT = 5;
 const float INTENSITY_THRESHOLD = 160.0f;
 const float image_resolution = 0.005f;
 
+tf2::Vector3 getGoal(tf2::Vector3 center, tf2::Quaternion rotation_quat) {
+    tf2::Vector3 dirVector;
+    dirVector.setX(0.5);
+    dirVector.setY(0);
+    dirVector.setZ(0);
+
+    // Нормализация кватерниона (рекомендуется)
+    rotation_quat.normalize();
+
+    // Поворот вектора
+    dirVector = tf2::quatRotate(rotation_quat, dirVector);
+    return center + dirVector;
+}
+
 MarkDetectorNode::MarkDetectorNode()
 : Node("mark_detector_node"), mNextDebugImageIndex(0), mFrameCounter(0)
 {
@@ -261,6 +275,26 @@ void MarkDetectorNode::sendMarker(int id, const Point3f &center, const Point3f &
     marker.pose.orientation.y = q.y();
     marker.pose.orientation.z = q.z();
     marker.pose.orientation.w = q.w();
+
+    {
+        tf2::Vector3 c;
+        c.setX(center.x);
+        c.setY(center.y);
+        c.setZ(center.z);
+
+        tf2::Quaternion q;
+        q.setX(marker.pose.orientation.x);
+        q.setY(marker.pose.orientation.y);
+        q.setZ(marker.pose.orientation.z);
+        q.setW(marker.pose.orientation.w);
+
+        auto nextGoal = getGoal(c, q);
+        RCLCPP_INFO(this->get_logger(), "DETECTED MARKER: %d %d center (%lf, %lf, %lf) -> goal (%lf, %lf, %lf)", 
+            id, markerType, 
+            center.x, center.y, center.z, 
+            nextGoal.x(), nextGoal.y(), nextGoal.z()    
+        );
+    }
 
     marker.scale.x = 0.01;
     marker.scale.y = 0.1;
