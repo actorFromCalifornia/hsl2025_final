@@ -108,6 +108,8 @@ private:
   // Grid origin - fixed at (0, 0)
   double grid_origin_x_;
   double grid_origin_y_;
+  double grid_origin_offset_x_;  // Offset coefficient for grid origin X (multiplied by cell_size)
+  double grid_origin_offset_y_;  // Offset coefficient for grid origin Y (multiplied by cell_size)
   
   // Coverage algorithm parameters
   double cell_selection_interval_;

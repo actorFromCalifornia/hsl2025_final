@@ -20,6 +20,8 @@ def generate_launch_description():
         parameters=[{
             'enable_marker_handling': True,
             'enable_cell_abort': False,
+            'grid_origin_offset_x': 0.25,
+            'grid_origin_offset_y': 1.5,
         }],
     )
     

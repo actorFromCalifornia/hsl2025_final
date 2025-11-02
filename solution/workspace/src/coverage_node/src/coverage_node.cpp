@@ -39,7 +39,9 @@ CoverageNode::CoverageNode()
   canceling_for_marker_(false),
   canceling_for_new_cell_(false),
   enable_marker_handling_(true),
-  enable_cell_abort_(true)
+  enable_cell_abort_(true),
+  grid_origin_offset_x_(0.25),
+  grid_origin_offset_y_(0.5)
 {
   // Declare parameters
   this->declare_parameter("grid_width_cells", 4);
@@ -47,6 +49,8 @@ CoverageNode::CoverageNode()
   this->declare_parameter("cell_size", 1.0);
   this->declare_parameter("enable_marker_handling", true);
   this->declare_parameter("enable_cell_abort", true);
+  this->declare_parameter("grid_origin_offset_x", 0.25);
+  this->declare_parameter("grid_origin_offset_y", 0.5);
   
   // Get parameters
   grid_width_cells_ = this->get_parameter("grid_width_cells").as_int();
@@ -54,15 +58,19 @@ CoverageNode::CoverageNode()
   cell_size_ = this->get_parameter("cell_size").as_double();
   enable_marker_handling_ = this->get_parameter("enable_marker_handling").as_bool();
   enable_cell_abort_ = this->get_parameter("enable_cell_abort").as_bool();
+  grid_origin_offset_x_ = this->get_parameter("grid_origin_offset_x").as_double();
+  grid_origin_offset_y_ = this->get_parameter("grid_origin_offset_y").as_double();
   
   RCLCPP_INFO(this->get_logger(), "Parameters: marker_handling=%s, cell_abort=%s", 
               enable_marker_handling_ ? "enabled" : "disabled",
               enable_cell_abort_ ? "enabled" : "disabled");
+  RCLCPP_INFO(this->get_logger(), "Grid origin offsets: x=%.2f, y=%.2f", 
+              grid_origin_offset_x_, grid_origin_offset_y_);
   
   // Grid origin is fixed - bottom-left corner of cell (0, 0) will be at world (0, 0)
   // No rotation needed - simple direct coordinates
-  grid_origin_x_ = 0.0 - 0.25 * cell_size_;
-  grid_origin_y_ = 0.0 - 0.5 * cell_size_;
+  grid_origin_x_ = 0.0 - grid_origin_offset_x_ * cell_size_;
+  grid_origin_y_ = 0.0 - grid_origin_offset_y_ * cell_size_;
   
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "/icp_odom", 10,
