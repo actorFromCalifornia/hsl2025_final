@@ -5,4 +5,4 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 echo "[docker] Building images via docker compose"
-docker compose -f "${SCRIPT_DIR}/docker-compose.yml" build
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" --profile bag --profile foxglove --profile robot build
