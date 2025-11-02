@@ -14,9 +14,17 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 namespace coverage_node
 {
+
+enum class NodeState {
+  COVERAGE,           // Обычный режим покрытия
+  GOING_TO_MARKER,    // Движение к маркеру
+  WAITING_AT_MARKER   // Ожидание 5 секунд у маркера
+};
 
 struct CellCoord {
   int x;
@@ -47,9 +55,11 @@ public:
 
 private:
   void odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg);
+  void marker_callback(const visualization_msgs::msg::Marker::SharedPtr msg);
   void publish_grid_visualization();
   void select_next_cell();
   void send_nav2_goal(const CellCoord& cell);
+  void send_nav2_goal_to_marker(const geometry_msgs::msg::PoseStamped& pose);
   void nav2_goal_response_callback(
     const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr & goal_handle);
   void nav2_feedback_callback(
@@ -57,17 +67,31 @@ private:
     const std::shared_ptr<const nav2_msgs::action::NavigateToPose::Feedback>);
   void nav2_result_callback(
     const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::WrappedResult & result);
+  void marker_wait_timer_callback();
   CellCoord world_to_cell(double x, double y, double origin_x, double origin_y) const;
   geometry_msgs::msg::PoseStamped cell_to_pose(const CellCoord& cell) const;
   double cell_distance(const CellCoord& cell1, const CellCoord& cell2) const;
 
   // Subscribers and publishers
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<visualization_msgs::msg::Marker>::SharedPtr marker_sub_;
   rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr grid_pub_;
   
   // Nav2 action client
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav2_client_;
   rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr current_goal_handle_;
+  
+  // Node state
+  NodeState node_state_;
+  
+  // Marker handling
+  std::optional<geometry_msgs::msg::PoseStamped> pending_marker_pose_;
+  std::optional<geometry_msgs::msg::PoseStamped> current_marker_pose_;  // Current marker being processed (for visualization)
+  int pending_marker_id_;  // ID of the pending marker
+  std::unordered_set<int> visited_marker_ids_;  // IDs of markers that have been visited
+  bool canceling_for_marker_;  // Flag to indicate we're canceling for a marker (not an error)
+  bool canceling_for_new_cell_;  // Flag to indicate we're canceling for a new cell goal (not an error)
+  rclcpp::TimerBase::SharedPtr marker_wait_timer_;
 
   // Grid parameters
   double cell_size_;
@@ -78,6 +102,7 @@ private:
   std::unordered_set<CellCoord, CellHash> visited_cells_;
   std::unordered_set<CellCoord, CellHash> aborted_cells_;  // Cells where goals were aborted/canceled
   std::optional<CellCoord> selected_cell_;
+  std::optional<CellCoord> canceled_cell_;  // Cell that was canceled (to check if it should be marked as aborted)
   std::optional<CellCoord> current_robot_cell_;
   
   // Grid origin - fixed at (0, 0)
@@ -91,6 +116,10 @@ private:
   // Visualization throttling
   rclcpp::Time last_visualization_time_;
   double visualization_interval_;
+
+  // Feature flags
+  bool enable_marker_handling_;  // Enable/disable marker handling
+  bool enable_cell_abort_;       // Enable/disable marking cells as aborted
 
 };
 
