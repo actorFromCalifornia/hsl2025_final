@@ -16,8 +16,8 @@
 
 using namespace std::chrono_literals;
 
-const int ACCUM_FRAMES_COUNT = 5;
-const float INTENSITY_THRESHOLD = 175.0f;
+const int ACCUM_FRAMES_COUNT = 3;
+const float INTENSITY_THRESHOLD = 160.0f;
 const float image_resolution = 0.005f;
 
 MarkDetectorNode::MarkDetectorNode()
@@ -340,7 +340,7 @@ std::vector<std::vector<PointXYZI>> MarkDetectorNode::detectPointClusters(
     // Евклидова кластеризация
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-    ec.setClusterTolerance(0.1); // 10cm
+    ec.setClusterTolerance(0.5); // 50cm
     ec.setMinClusterSize(5);
     ec.setMaxClusterSize(10000);
     ec.setSearchMethod(tree);

@@ -119,16 +119,24 @@ geometry_msgs::msg::PoseStamped CoverageNode::cell_to_pose(const CellCoord& cell
 void CoverageNode::send_nav2_goal(const CellCoord& cell)
 {
   if (!nav2_client_->wait_for_action_server(std::chrono::seconds(1))) {
+    RCLCPP_WARN(this->get_logger(), "Nav2 action server not available, skipping goal for cell (%d, %d)", cell.x, cell.y);
     return;
   }
   
   // Cancel previous goal if exists
   if (current_goal_handle_) {
+    RCLCPP_DEBUG(this->get_logger(), "Cancelling previous goal");
     nav2_client_->async_cancel_goal(current_goal_handle_);
   }
   
   auto goal_msg = nav2_msgs::action::NavigateToPose::Goal();
   goal_msg.pose = cell_to_pose(cell);
+  
+  RCLCPP_INFO(this->get_logger(), "Setting Nav2 goal: cell (%d, %d) -> pose (%.2f, %.2f, %.2f)", 
+              cell.x, cell.y, 
+              goal_msg.pose.pose.position.x, 
+              goal_msg.pose.pose.position.y,
+              goal_msg.pose.pose.position.z);
   
   auto send_goal_options = rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SendGoalOptions();
   send_goal_options.goal_response_callback =
@@ -139,15 +147,18 @@ void CoverageNode::send_nav2_goal(const CellCoord& cell)
     std::bind(&CoverageNode::nav2_result_callback, this, std::placeholders::_1);
   
   nav2_client_->async_send_goal(goal_msg, send_goal_options);
+  RCLCPP_INFO(this->get_logger(), "Nav2 goal sent asynchronously for cell (%d, %d)", cell.x, cell.y);
 }
 
 void CoverageNode::nav2_goal_response_callback(
   const rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr & goal_handle)
 {
   if (!goal_handle) {
+    RCLCPP_WARN(this->get_logger(), "Nav2 goal was rejected");
     return;
   }
   current_goal_handle_ = goal_handle;
+  RCLCPP_INFO(this->get_logger(), "Nav2 goal accepted");
 }
 
 void CoverageNode::nav2_feedback_callback(
@@ -162,13 +173,16 @@ void CoverageNode::nav2_result_callback(
 {
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
-      // Goal reached - mark cell as visited if needed
+      RCLCPP_INFO(this->get_logger(), "Nav2 goal succeeded - reached target cell");
       break;
     case rclcpp_action::ResultCode::ABORTED:
+      RCLCPP_WARN(this->get_logger(), "Nav2 goal aborted");
+      break;
     case rclcpp_action::ResultCode::CANCELED:
-      // Goal failed or canceled
+      RCLCPP_INFO(this->get_logger(), "Nav2 goal canceled");
       break;
     default:
+      RCLCPP_WARN(this->get_logger(), "Nav2 goal ended with unknown result code");
       break;
   }
   current_goal_handle_.reset();
@@ -211,13 +225,22 @@ void CoverageNode::select_next_cell()
 
   if (best_cell.has_value()) {
     CellCoord previous_selected = selected_cell_.value_or(CellCoord(-1, -1));
+    CellCoord new_cell = best_cell.value();
+    
+    RCLCPP_INFO(this->get_logger(), "Selected next cell: (%d, %d), distance: %.2f, robot at cell: (%d, %d)", 
+                new_cell.x, new_cell.y, min_distance, robot_cell.x, robot_cell.y);
+    
     selected_cell_ = best_cell;
     
     // Send goal to Nav2 if this is a new cell
-    if (previous_selected != best_cell.value()) {
-      send_nav2_goal(best_cell.value());
+    if (previous_selected != new_cell) {
+      RCLCPP_INFO(this->get_logger(), "New cell selected, sending Nav2 goal");
+      send_nav2_goal(new_cell);
+    } else {
+      RCLCPP_DEBUG(this->get_logger(), "Same cell selected again, not sending new goal");
     }
   } else {
+    RCLCPP_INFO(this->get_logger(), "All cells visited! Coverage complete.");
     selected_cell_.reset();
   }
 }
