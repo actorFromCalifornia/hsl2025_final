@@ -14,6 +14,8 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 namespace coverage_node
 {

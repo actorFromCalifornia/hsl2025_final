@@ -2,9 +2,26 @@
 #include <cmath>
 #include <thread>
 #include <chrono>
+#include <tf2/LinearMath/Vector3.h>
+#include <tf2/LinearMath/Quaternion.h>
 
 namespace coverage_node
 {
+
+// Helper function to calculate goal position relative to marker (same as in mark_detector_node)
+tf2::Vector3 getGoal(tf2::Vector3 center, tf2::Quaternion rotation_quat) {
+    tf2::Vector3 dirVector;
+    dirVector.setX(0.5);
+    dirVector.setY(0);
+    dirVector.setZ(0);
+
+    // Нормализация кватерниона (рекомендуется)
+    rotation_quat.normalize();
+
+    // Поворот вектора
+    dirVector = tf2::quatRotate(rotation_quat, dirVector);
+    return center + dirVector;
+}
 
 CoverageNode::CoverageNode()
 : Node("coverage_node"),
@@ -354,9 +371,10 @@ void CoverageNode::select_next_cell()
 
 void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::SharedPtr msg)
 {
-  // Process marker detection
+  // Process marker detection - only process CUBE markers (not SPHERE)
   if (msg->action == visualization_msgs::msg::Marker::ADD && 
-      msg->ns == "marks") {
+      msg->ns == "marks" &&
+      msg->type == visualization_msgs::msg::Marker::CUBE) {
     
     int marker_id = msg->id;
     
@@ -394,12 +412,36 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
       selected_cell_.reset();
     }
     
-    // Save marker position and ID
+    // Calculate goal position using getGoal method (offset 0.5m from marker center in marker direction)
+    tf2::Vector3 center;
+    center.setX(msg->pose.position.x);
+    center.setY(msg->pose.position.y);
+    center.setZ(msg->pose.position.z);
+    
+    tf2::Quaternion rotation_quat;
+    rotation_quat.setX(msg->pose.orientation.x);
+    rotation_quat.setY(msg->pose.orientation.y);
+    rotation_quat.setZ(msg->pose.orientation.z);
+    rotation_quat.setW(msg->pose.orientation.w);
+    
+    tf2::Vector3 goal_position = getGoal(center, rotation_quat);
+    
+    // Save marker goal position and ID
     geometry_msgs::msg::PoseStamped marker_pose;
     marker_pose.header = msg->header;
-    marker_pose.pose = msg->pose;
+    marker_pose.pose.position.x = goal_position.x();
+    marker_pose.pose.position.y = goal_position.y();
+    marker_pose.pose.position.z = goal_position.z();
+    // Use marker orientation for goal
+    marker_pose.pose.orientation = msg->pose.orientation;
+    
     pending_marker_pose_ = marker_pose;
     pending_marker_id_ = marker_id;
+    
+    RCLCPP_INFO(this->get_logger(), "Marker ID %d: center (%.2f, %.2f, %.2f) -> goal (%.2f, %.2f, %.2f)", 
+                marker_id, 
+                center.x(), center.y(), center.z(),
+                goal_position.x(), goal_position.y(), goal_position.z());
     
     // Switch to marker mode and send goal immediately
     node_state_ = NodeState::GOING_TO_MARKER;
