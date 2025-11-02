@@ -31,6 +31,14 @@ struct Plane {
     Point3f point;
 };
 
+struct Mark {
+    int id;
+    Point3f center;
+    Point3f normal;
+    bool isRed;
+    bool isStable;
+};
+
 class MarkRecognizer;
 
 class MarkDetectorNode : public rclcpp::Node
@@ -65,4 +73,5 @@ private:
 
     std::shared_ptr<MarkRecognizer> m_pMarkRecognizer;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr m_pMarksPublisher;
+    std::vector<Mark> mMarks;
 };

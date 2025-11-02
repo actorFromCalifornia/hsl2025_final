@@ -173,13 +173,29 @@ void CoverageNode::nav2_result_callback(
 {
   switch (result.code) {
     case rclcpp_action::ResultCode::SUCCEEDED:
-      RCLCPP_INFO(this->get_logger(), "Nav2 goal succeeded - reached target cell");
+      RCLCPP_INFO(this->get_logger(), "Nav2 goal succeeded - reached target");
       break;
     case rclcpp_action::ResultCode::ABORTED:
       RCLCPP_WARN(this->get_logger(), "Nav2 goal aborted");
+      // Mark current selected cell as aborted
+      if (selected_cell_.has_value()) {
+        aborted_cells_.insert(selected_cell_.value());
+        RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as aborted", 
+                    selected_cell_.value().x, selected_cell_.value().y);
+      }
+      // Try to select a new cell
+      select_next_cell();
       break;
     case rclcpp_action::ResultCode::CANCELED:
       RCLCPP_INFO(this->get_logger(), "Nav2 goal canceled");
+      // Mark current selected cell as aborted
+      if (selected_cell_.has_value()) {
+        aborted_cells_.insert(selected_cell_.value());
+        RCLCPP_INFO(this->get_logger(), "Cell (%d, %d) marked as canceled", 
+                    selected_cell_.value().x, selected_cell_.value().y);
+      }
+      // Try to select a new cell
+      select_next_cell();
       break;
     default:
       RCLCPP_WARN(this->get_logger(), "Nav2 goal ended with unknown result code");
@@ -202,13 +218,18 @@ void CoverageNode::select_next_cell()
   double min_distance = std::numeric_limits<double>::max();
   std::optional<CellCoord> best_cell;
 
-  // Find nearest unvisited cell
+  // Find nearest unvisited cell (skip visited and aborted cells)
   for (int x = 0; x < cells_x; ++x) {
     for (int y = 0; y < cells_y; ++y) {
       CellCoord cell(x, y);
       
       // Skip visited cells
       if (visited_cells_.find(cell) != visited_cells_.end()) {
+        continue;
+      }
+      
+      // Skip aborted cells (they will be shown in a different color)
+      if (aborted_cells_.find(cell) != aborted_cells_.end()) {
         continue;
       }
       
@@ -295,6 +316,8 @@ void CoverageNode::publish_grid_visualization()
       cell_marker.scale.y = cell_size_ * 0.9;
       cell_marker.scale.z = 0.01;
       
+      bool is_aborted = aborted_cells_.find(cell) != aborted_cells_.end();
+      
       if (is_selected) {
         // Selected cell - red
         cell_marker.color.r = 1.0;
@@ -307,6 +330,12 @@ void CoverageNode::publish_grid_visualization()
         cell_marker.color.g = 1.0;
         cell_marker.color.b = 0.0;
         cell_marker.color.a = 0.3;
+      } else if (is_aborted) {
+        // Aborted/canceled cells - orange/magenta
+        cell_marker.color.r = 1.0;
+        cell_marker.color.g = 0.5;
+        cell_marker.color.b = 0.0;
+        cell_marker.color.a = 0.5;
       } else {
         // Unknown cells - yellow
         cell_marker.color.r = 1.0;

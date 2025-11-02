@@ -76,6 +76,7 @@ private:
 
   // Coverage tracking
   std::unordered_set<CellCoord, CellHash> visited_cells_;
+  std::unordered_set<CellCoord, CellHash> aborted_cells_;  // Cells where goals were aborted/canceled
   std::optional<CellCoord> selected_cell_;
   std::optional<CellCoord> current_robot_cell_;
   

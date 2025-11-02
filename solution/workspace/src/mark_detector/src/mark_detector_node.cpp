@@ -16,7 +16,7 @@
 
 using namespace std::chrono_literals;
 
-const int ACCUM_FRAMES_COUNT = 3;
+const int ACCUM_FRAMES_COUNT = 5;
 const float INTENSITY_THRESHOLD = 160.0f;
 const float image_resolution = 0.005f;
 
@@ -141,11 +141,31 @@ void MarkDetectorNode::processAccumulatedPoints()
             if (!projected_image.empty()) {
                 // Сохраняем отладочное изображение
                 saveDebugDebugImage(projected_image);
+                double markWidth = projected_image.cols * image_resolution;
+                double markHeight = projected_image.rows * image_resolution;
                 Point3f center;
                 for (auto& p : cluster) {
                     center += p;
                 }
                 center /= cluster.size();
+
+                bool isStable = false;
+                bool isRed = false;
+
+                // признаки для меток:
+                // поля - 0
+                // 1. ширина и высота. 
+                //    красная метка - 0.15
+                //    белая метка - 0.1
+                //    синяя метка - 0.125 x 0.195
+                // 2. "Яркость" метки:
+                //   красная - 0.8
+                //   белая - 1.0
+                //   синяя - 0.5
+
+                cv::Scalar meanColor = cv::mean(projected_image);
+                auto g = meanColor[1];//((meanColor & 0xff00) >> 8);
+                float brightness = g / 255.0f;
                 
                 if (m_pMarkRecognizer) {
                     auto detections = m_pMarkRecognizer->detect(projected_image);
@@ -153,10 +173,54 @@ void MarkDetectorNode::processAccumulatedPoints()
                         RCLCPP_INFO(this->get_logger(), "Detected mark %d with confidence %f", detection.classId, detection.confidence);
                     }
                 } else {
-                    RCLCPP_WARN(this->get_logger(), "Mark recognizer not initialized");
+                    if (markWidth >= 0.125 && markWidth <= 0.17
+                    && markHeight >= 0.125 && markHeight <= 0.17
+                    && brightness >= 0.6 && brightness <= 0.9) {
+                        // красная метка
+                        isRed = true;
+                    } else if (markWidth >= 0.08 && markWidth <= 0.125
+                    && markHeight >= 0.08 && markHeight <= 0.125
+                    && brightness >= 0.9) {
+                        // белая метка
+                    } else if (markWidth >= 0.105 && markWidth <= 0.145
+                    && markHeight >= 0.175 && markHeight <= 0.215
+                    && brightness >= 0.3 && brightness <= 0.55) {
+                        // синяя метка
+                    // RCLCPP_WARN(this->get_logger(), "Mark recognizer not initialized");
+                    } else {
+                    // мусор
+                        continue;
+                    }
                 }
 
-                sendMarker(0, center, plane.normal, visualization_msgs::msg::Marker::CUBE, 0, 1, 0);
+                Mark detectedMark;
+                detectedMark.id = mMarks.size();
+                detectedMark.isRed = isRed;
+                detectedMark.isStable = isStable;
+                detectedMark.center = center;
+                detectedMark.normal = plane.normal;
+                for (int markId = 0; markId < mMarks.size(); markId++) {
+                    auto mark = mMarks[markId];
+                    if ((mark.center - detectedMark.center).length() < 0.5) {
+                        detectedMark.center = (mark.center + detectedMark.center) / 2;
+                        detectedMark.normal = (mark.normal + detectedMark.normal) / 2;
+                        detectedMark.id = mark.id;
+                        break;
+                    }
+                }
+                if (detectedMark.id >= mMarks.size()) {
+                    mMarks.push_back(detectedMark);
+                }
+
+                sendMarker(
+                    detectedMark.id, 
+                    detectedMark.center, 
+                    detectedMark.normal, 
+                    detectedMark.isRed ? visualization_msgs::msg::Marker::SPHERE : visualization_msgs::msg::Marker::CUBE, 
+                    detectedMark.isRed ? 1 : 0, 
+                    detectedMark.isRed ? 0 : 1, 
+                    0
+                );
             }
         }
         
@@ -473,7 +537,7 @@ cv::Mat MarkDetectorNode::projectPointsOnPlane(const std::vector<PointXYZI> &poi
         }
         
         // Создаем изображение
-        const float margin = 0.02f; // 10cm margin
+        const float margin = 0.00f; // 2cm margin
         
         float range_u = max_u - min_u + 2 * margin;
         float range_v = max_v - min_v + 2 * margin;
