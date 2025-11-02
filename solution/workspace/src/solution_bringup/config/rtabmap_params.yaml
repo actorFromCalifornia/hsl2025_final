@@ -94,7 +94,7 @@ icp_odometry:
     Reg/Strategy: "1"  # "0"=Visual, "1"=ICP, "2"=Visual+ICP
     Reg/Force3DoF: "true"
     Icp/Strategy: "1"  # "0"=PointToPlane, "1"=PointToPoint
-    Icp/VoxelSize: "0.03"
+    Icp/VoxelSize: "0.05"
     Icp/Iterations: "10"
     Icp/CorrespondenceRatio: "0.05"
     Icp/MaxCorrespondenceDistance: "0.5"

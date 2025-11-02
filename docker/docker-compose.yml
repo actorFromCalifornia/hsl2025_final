@@ -27,7 +27,7 @@ services:
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
                      source /kobuki_ws/install/setup.bash && \
                      source /workspace/install/setup.bash && \
-                     ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_11_02-08_29_46}\" --clock --rate 1.0 --topics /tf_static /livox/lidar"
+                     ros2 bag play \"${BAG_PATH:-/workspace/bags/rosbag2_2025_11_02-08_56_48}\" --clock --rate 1.0"
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
       - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
@@ -43,6 +43,7 @@ services:
       dockerfile: docker/Dockerfile
     container_name: hsl2025-kobuki
     privileged: true
+    profiles: ["robot"]
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-7}
     network_mode: "host"
