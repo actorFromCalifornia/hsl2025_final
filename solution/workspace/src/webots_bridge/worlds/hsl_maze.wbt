@@ -3,9 +3,8 @@
 EXTERNPROTO "../objects/backgrounds/protos/TexturedBackground.proto"
 EXTERNPROTO "../objects/backgrounds/protos/TexturedBackgroundLight.proto"
 EXTERNPROTO "../objects/floors/protos/RectangleArena.proto"
-
-EXTERNPROTO "../protos/TrafficCone.proto"
-EXTERNPROTO "../protos/CobraFlex.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/develop/projects/robots/robotis/turtlebot/protos/TurtleBot3Burger.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/develop/projects/devices/robotis/protos/RobotisLds01.proto"
 EXTERNPROTO "../protos/GeneratedMaze.proto"
 EXTERNPROTO "../protos/GeneratedCones.proto"
 
@@ -14,29 +13,31 @@ WorldInfo {
   basicTimeStep 16
 }
 Viewpoint {
-  orientation 0.2704778919174105 0.30892271133036786 -0.9118160277206185 1.787322460899992
-  position 2.091586362768177 5.704464683699639 3.4628250261046634
+  orientation -0.3695181836117044 0.7129897537569717 0.5959042901489127 1.4628833749792027
+  position -0.19344583323816444 -0.40477215823285634 1.5648183842089205
 }
-TexturedBackground { }
-TexturedBackgroundLight { }
-
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
 RectangleArena {
-  floorSize 1.5 3
-  wallHeight 0.4
-  translation 0.75 1.5 0
+  floorSize 4 8
+  wallHeight 0.5
+  translation 2.0 4.0 0
 }
-
-# Maze
-GeneratedMaze { }
-GeneratedCones { }
-
-# Robot
-CobraFlex {
-  translation 0.25 0.19 0
-  rotation 0 0.707107 0.707107 3.14159
+GeneratedMaze {
+}
+GeneratedCones {
+}
+TurtleBot3Burger {
+  translation 0.5 1.5 0
   controller "<extern>"
-  leftFrontAnchor 0.07730000000000001 0.03501373400000003 0.08200000000000009
-  leftRearAnchor -0.07730000000000002 0.03501373399999996 0.08200000000000003
-  rightFrontAnchor 0.07730000000000002 0.03501373400000014 -0.08200000000000003
-  rightRearAnchor -0.07729999999999998 0.03501373399999994 -0.08200000000000002
+  controllerArgs [
+    ""
+  ]
+  extensionSlot [
+    RobotisLds01 {
+      translation 0 0 0.1
+    }
+  ]
 }
