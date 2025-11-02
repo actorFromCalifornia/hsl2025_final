@@ -17,7 +17,10 @@ def generate_launch_description():
         executable='coverage_node',
         name='coverage_node',
         output='screen',
-        parameters=[],
+        parameters=[{
+            'enable_marker_handling': True,
+            'enable_cell_abort': False,
+        }],
     )
     
     return LaunchDescription([

@@ -37,17 +37,27 @@ CoverageNode::CoverageNode()
   node_state_(NodeState::COVERAGE),
   pending_marker_id_(-1),
   canceling_for_marker_(false),
-  canceling_for_new_cell_(false)
+  canceling_for_new_cell_(false),
+  enable_marker_handling_(true),
+  enable_cell_abort_(true)
 {
   // Declare parameters
   this->declare_parameter("grid_width_cells", 4);
   this->declare_parameter("grid_height_cells", 8);
   this->declare_parameter("cell_size", 1.0);
+  this->declare_parameter("enable_marker_handling", true);
+  this->declare_parameter("enable_cell_abort", true);
   
   // Get parameters
   grid_width_cells_ = this->get_parameter("grid_width_cells").as_int();
   grid_height_cells_ = this->get_parameter("grid_height_cells").as_int();
   cell_size_ = this->get_parameter("cell_size").as_double();
+  enable_marker_handling_ = this->get_parameter("enable_marker_handling").as_bool();
+  enable_cell_abort_ = this->get_parameter("enable_cell_abort").as_bool();
+  
+  RCLCPP_INFO(this->get_logger(), "Parameters: marker_handling=%s, cell_abort=%s", 
+              enable_marker_handling_ ? "enabled" : "disabled",
+              enable_cell_abort_ ? "enabled" : "disabled");
   
   // Grid origin is fixed - bottom-left corner of cell (0, 0) will be at world (0, 0)
   // No rotation needed - simple direct coordinates
@@ -222,7 +232,7 @@ void CoverageNode::nav2_result_callback(
         visited_marker_ids_.insert(pending_marker_id_);
         node_state_ = NodeState::WAITING_AT_MARKER;
         marker_wait_timer_->reset(); // Start the 5 second timer
-        // Clear pending marker
+        // Clear pending marker but keep current_marker_pose_ for visualization
         pending_marker_pose_.reset();
         pending_marker_id_ = -1;
       }
@@ -234,8 +244,8 @@ void CoverageNode::nav2_result_callback(
       break;
     case rclcpp_action::ResultCode::ABORTED:
       RCLCPP_WARN(this->get_logger(), "Nav2 goal aborted");
-      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell)
-      if (!canceling_for_marker_ && !canceling_for_new_cell_) {
+      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell) and if enabled
+      if (enable_cell_abort_ && !canceling_for_marker_ && !canceling_for_new_cell_) {
         // Use canceled_cell_ if available (the cell that was actually canceled), otherwise use selected_cell_
         CellCoord cell_to_mark = canceled_cell_.has_value() ? canceled_cell_.value() : 
                                  (selected_cell_.has_value() ? selected_cell_.value() : CellCoord(-1, -1));
@@ -246,6 +256,8 @@ void CoverageNode::nav2_result_callback(
         }
       } else if (canceling_for_new_cell_) {
         RCLCPP_DEBUG(this->get_logger(), "Goal canceled for new cell - previous cell not marked as aborted");
+      } else if (!enable_cell_abort_) {
+        RCLCPP_DEBUG(this->get_logger(), "Cell abort disabled - cell not marked as aborted");
       }
       // Clear canceled_cell_ and reset canceling flags
       canceled_cell_.reset();
@@ -256,6 +268,7 @@ void CoverageNode::nav2_result_callback(
         RCLCPP_WARN(this->get_logger(), "Marker ID %d goal aborted, returning to coverage mode", pending_marker_id_);
         node_state_ = NodeState::COVERAGE;
         pending_marker_pose_.reset();
+        current_marker_pose_.reset();
         pending_marker_id_ = -1;
       }
       // Try to select a new cell if in coverage mode
@@ -265,8 +278,8 @@ void CoverageNode::nav2_result_callback(
       break;
     case rclcpp_action::ResultCode::CANCELED:
       RCLCPP_INFO(this->get_logger(), "Nav2 goal canceled");
-      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell)
-      if (!canceling_for_marker_ && !canceling_for_new_cell_) {
+      // Mark cell as aborted only if it was a real error (not canceled for marker or new cell) and if enabled
+      if (enable_cell_abort_ && !canceling_for_marker_ && !canceling_for_new_cell_) {
         // Use canceled_cell_ if available (the cell that was actually canceled), otherwise use selected_cell_
         CellCoord cell_to_mark = canceled_cell_.has_value() ? canceled_cell_.value() : 
                                  (selected_cell_.has_value() ? selected_cell_.value() : CellCoord(-1, -1));
@@ -279,6 +292,8 @@ void CoverageNode::nav2_result_callback(
         RCLCPP_DEBUG(this->get_logger(), "Goal canceled for marker - cell not marked as aborted");
       } else if (canceling_for_new_cell_) {
         RCLCPP_DEBUG(this->get_logger(), "Goal canceled for new cell - previous cell not marked as aborted");
+      } else if (!enable_cell_abort_) {
+        RCLCPP_DEBUG(this->get_logger(), "Cell abort disabled - cell not marked as aborted");
       }
       // Clear canceled_cell_ and reset canceling flags
       canceled_cell_.reset();
@@ -289,6 +304,7 @@ void CoverageNode::nav2_result_callback(
         RCLCPP_INFO(this->get_logger(), "Marker ID %d goal canceled, returning to coverage mode", pending_marker_id_);
         node_state_ = NodeState::COVERAGE;
         pending_marker_pose_.reset();
+        current_marker_pose_.reset();
         pending_marker_id_ = -1;
       }
       // Try to select a new cell if in coverage mode
@@ -371,6 +387,11 @@ void CoverageNode::select_next_cell()
 
 void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::SharedPtr msg)
 {
+  // Skip marker handling if disabled
+  if (!enable_marker_handling_) {
+    return;
+  }
+  
   // Process marker detection - only process CUBE markers (not SPHERE)
   if (msg->action == visualization_msgs::msg::Marker::ADD && 
       msg->ns == "marks" &&
@@ -383,14 +404,14 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
       RCLCPP_DEBUG(this->get_logger(), "Marker ID %d already visited, ignoring", marker_id);
       return;
     }
-    
+
     // Skip if we're already going to a marker (or waiting at one)
     if (node_state_ == NodeState::GOING_TO_MARKER || node_state_ == NodeState::WAITING_AT_MARKER) {
       RCLCPP_DEBUG(this->get_logger(), "Marker ID %d detected but already processing marker ID %d, ignoring", 
                    marker_id, pending_marker_id_);
       return;
     }
-    
+
     RCLCPP_INFO(this->get_logger(), "Marker ID %d detected at (%.2f, %.2f, %.2f)", 
                 marker_id, msg->pose.position.x, msg->pose.position.y, msg->pose.position.z);
     
@@ -436,6 +457,7 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
     marker_pose.pose.orientation = msg->pose.orientation;
     
     pending_marker_pose_ = marker_pose;
+    current_marker_pose_ = marker_pose;  // Save for visualization
     pending_marker_id_ = marker_id;
     
     RCLCPP_INFO(this->get_logger(), "Marker ID %d: center (%.2f, %.2f, %.2f) -> goal (%.2f, %.2f, %.2f)", 
@@ -489,6 +511,8 @@ void CoverageNode::marker_wait_timer_callback()
   RCLCPP_INFO(this->get_logger(), "Marker wait completed, returning to coverage mode");
   marker_wait_timer_->cancel();
   node_state_ = NodeState::COVERAGE;
+  // Clear marker visualization
+  current_marker_pose_.reset();
   // Resume coverage algorithm
   select_next_cell();
 }
@@ -505,7 +529,7 @@ void CoverageNode::publish_grid_visualization()
   int cells_y = grid_height_cells_;
   
     auto grid_msg = std::make_shared<visualization_msgs::msg::MarkerArray>();
-  grid_msg->markers.reserve(cells_y + 1 + cells_x + 1 + cells_x * cells_y);  // Lines + cells
+  grid_msg->markers.reserve(cells_y + 1 + cells_x + 1 + cells_x * cells_y + 2);  // Lines + cells + marker visualization
 
     int marker_id = 0;
 
@@ -602,10 +626,10 @@ void CoverageNode::publish_grid_visualization()
     // Convert to world coordinates (no rotation)
     p1.x = grid_origin_x_ + local_x1;
     p1.y = grid_origin_y_ + local_y1;
-    p1.z = 0.0;
+      p1.z = 0.0;
     p2.x = grid_origin_x_ + local_x2;
     p2.y = grid_origin_y_ + local_y2;
-    p2.z = 0.0;
+      p2.z = 0.0;
       marker.points.push_back(p1);
       marker.points.push_back(p2);
       grid_msg->markers.push_back(marker);
@@ -638,14 +662,69 @@ void CoverageNode::publish_grid_visualization()
     // Convert to world coordinates (no rotation)
     p1.x = grid_origin_x_ + local_x1;
     p1.y = grid_origin_y_ + local_y1;
-    p1.z = 0.0;
+      p1.z = 0.0;
     p2.x = grid_origin_x_ + local_x2;
     p2.y = grid_origin_y_ + local_y2;
-    p2.z = 0.0;
+      p2.z = 0.0;
       marker.points.push_back(p1);
       marker.points.push_back(p2);
       grid_msg->markers.push_back(marker);
     }
+
+  // Visualize target marker if we're going to it or waiting at it
+  if ((node_state_ == NodeState::GOING_TO_MARKER || node_state_ == NodeState::WAITING_AT_MARKER) && 
+      current_marker_pose_.has_value()) {
+    
+    // Visualize marker goal position
+    visualization_msgs::msg::Marker target_marker;
+    target_marker.header.frame_id = "map";
+    target_marker.header.stamp = now;
+    target_marker.ns = "target_marker";
+    target_marker.id = marker_id++;
+    target_marker.type = visualization_msgs::msg::Marker::SPHERE;
+    target_marker.action = visualization_msgs::msg::Marker::ADD;
+    
+    // Use goal position (from getGoal)
+    target_marker.pose.position.x = current_marker_pose_->pose.position.x;
+    target_marker.pose.position.y = current_marker_pose_->pose.position.y;
+    target_marker.pose.position.z = current_marker_pose_->pose.position.z;
+    target_marker.pose.orientation = current_marker_pose_->pose.orientation;
+    
+    target_marker.scale.x = 0.3;
+    target_marker.scale.y = 0.3;
+    target_marker.scale.z = 0.3;
+    
+    // Blue color for target marker
+    target_marker.color.r = 0.0;
+    target_marker.color.g = 0.0;
+    target_marker.color.b = 1.0;
+    target_marker.color.a = 0.8;
+    
+    grid_msg->markers.push_back(target_marker);
+    
+    // Visualize arrow pointing to marker goal
+    visualization_msgs::msg::Marker arrow_marker;
+    arrow_marker.header.frame_id = "map";
+    arrow_marker.header.stamp = now;
+    arrow_marker.ns = "marker_arrow";
+    arrow_marker.id = marker_id++;
+    arrow_marker.type = visualization_msgs::msg::Marker::ARROW;
+    arrow_marker.action = visualization_msgs::msg::Marker::ADD;
+    
+    arrow_marker.pose = current_marker_pose_->pose;
+    
+    arrow_marker.scale.x = 0.6;  // shaft diameter
+    arrow_marker.scale.y = 0.8;  // head diameter
+    arrow_marker.scale.z = 0.5;  // head length
+    
+    // Cyan color for arrow
+    arrow_marker.color.r = 0.0;
+    arrow_marker.color.g = 1.0;
+    arrow_marker.color.b = 1.0;
+    arrow_marker.color.a = 0.9;
+    
+    grid_msg->markers.push_back(arrow_marker);
+  }
 
     grid_pub_->publish(*grid_msg);
 }

@@ -86,6 +86,7 @@ private:
   
   // Marker handling
   std::optional<geometry_msgs::msg::PoseStamped> pending_marker_pose_;
+  std::optional<geometry_msgs::msg::PoseStamped> current_marker_pose_;  // Current marker being processed (for visualization)
   int pending_marker_id_;  // ID of the pending marker
   std::unordered_set<int> visited_marker_ids_;  // IDs of markers that have been visited
   bool canceling_for_marker_;  // Flag to indicate we're canceling for a marker (not an error)
@@ -115,6 +116,10 @@ private:
   // Visualization throttling
   rclcpp::Time last_visualization_time_;
   double visualization_interval_;
+
+  // Feature flags
+  bool enable_marker_handling_;  // Enable/disable marker handling
+  bool enable_cell_abort_;       // Enable/disable marking cells as aborted
 
 };
 
