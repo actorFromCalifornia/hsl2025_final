@@ -215,7 +215,7 @@ void MarkDetectorNode::processAccumulatedPoints()
                 detectedMark.normal = plane.normal;
                 for (int markId = 0; markId < mMarks.size(); markId++) {
                     auto mark = mMarks[markId];
-                    if ((mark.center - detectedMark.center).length() < 0.5) {
+                    if ((mark.center - detectedMark.center).length() < 0.3) {
                         detectedMark.center = (mark.center + detectedMark.center) / 2;
                         detectedMark.normal = (mark.normal + detectedMark.normal) / 2;
                         detectedMark.id = mark.id;
@@ -438,7 +438,7 @@ std::vector<std::vector<PointXYZI>> MarkDetectorNode::detectPointClusters(
     // Евклидова кластеризация
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-    ec.setClusterTolerance(0.5); // 50cm
+    ec.setClusterTolerance(0.3); // 50cm
     ec.setMinClusterSize(5);
     ec.setMaxClusterSize(10000);
     ec.setSearchMethod(tree);

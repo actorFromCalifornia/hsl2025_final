@@ -8,6 +8,9 @@
 namespace coverage_node
 {
 
+  double robot_x = 0;
+  double robot_y = 0;
+
 // Helper function to calculate goal position relative to marker (same as in mark_detector_node)
 tf2::Vector3 getGoal(tf2::Vector3 center, tf2::Quaternion rotation_quat) {
     tf2::Vector3 dirVector;
@@ -113,8 +116,8 @@ CellCoord CoverageNode::world_to_cell(double x, double y, double origin_x, doubl
 
 void CoverageNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
-  double robot_x = msg->pose.pose.position.x;
-  double robot_y = msg->pose.pose.position.y;
+  robot_x = msg->pose.pose.position.x;
+  robot_y = msg->pose.pose.position.y;
 
   // Use fixed grid origin (0, 0)
   CellCoord cell = world_to_cell(robot_x, robot_y, 0.0, 0.0);
@@ -271,14 +274,6 @@ void CoverageNode::nav2_result_callback(
       canceled_cell_.reset();
       canceling_for_marker_ = false;
       canceling_for_new_cell_ = false;
-      // If aborted while going to marker, return to coverage mode
-      if (node_state_ == NodeState::GOING_TO_MARKER) {
-        RCLCPP_WARN(this->get_logger(), "Marker ID %d goal aborted, returning to coverage mode", pending_marker_id_);
-        node_state_ = NodeState::COVERAGE;
-        pending_marker_pose_.reset();
-        current_marker_pose_.reset();
-        pending_marker_id_ = -1;
-      }
       // Try to select a new cell if in coverage mode
       if (node_state_ == NodeState::COVERAGE) {
         select_next_cell();
@@ -446,6 +441,11 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
     center.setX(msg->pose.position.x);
     center.setY(msg->pose.position.y);
     center.setZ(msg->pose.position.z);
+
+    tf2::Vector3 robot;
+    robot.setX(robot_x);
+    robot.setY(robot_y);
+    robot.setZ(0);
     
     tf2::Quaternion rotation_quat;
     rotation_quat.setX(msg->pose.orientation.x);
@@ -454,6 +454,16 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
     rotation_quat.setW(msg->pose.orientation.w);
     
     tf2::Vector3 goal_position = getGoal(center, rotation_quat);
+    tf2::Vector3 goal_position2 = getGoal(center, rotation_quat.inverse());
+    auto rotation = rotation_quat.inverse();
+
+    auto distance1 = (robot - goal_position).length();
+    auto distance2 = (robot - goal_position2).length();
+
+    if (distance2 < distance1) {
+      goal_position = goal_position2;
+      rotation = rotation_quat;
+    }
     
     // Save marker goal position and ID
     geometry_msgs::msg::PoseStamped marker_pose;
@@ -462,7 +472,10 @@ void CoverageNode::marker_callback(const visualization_msgs::msg::Marker::Shared
     marker_pose.pose.position.y = goal_position.y();
     marker_pose.pose.position.z = goal_position.z();
     // Use marker orientation for goal
-    marker_pose.pose.orientation = msg->pose.orientation;
+    marker_pose.pose.orientation.x = rotation.x();
+    marker_pose.pose.orientation.y = rotation.y();
+    marker_pose.pose.orientation.z = rotation.z();
+    marker_pose.pose.orientation.w = rotation.w();
     
     pending_marker_pose_ = marker_pose;
     current_marker_pose_ = marker_pose;  // Save for visualization

@@ -50,8 +50,12 @@ services:
     volumes:
       - ../docker_ws:/workspace/docker_ws
       - /dev:/dev 
+      - ../solution/workspace:/workspace
+      - ../launch:/workspace/launch
+      - ../docker:/workspace/docker
     command: >
       /bin/bash -lc "source /opt/ros/${ROS_DISTRO:-humble}/setup.bash && \
+                     cd /workspace && colcon build && \
                      source /kobuki_ws/install/setup.bash && \
                      source /workspace/install/setup.bash && \
                      ros2 launch /workspace/launch/bringup.launch.py mode:=${BRINGUP_MODE:-bag}"
